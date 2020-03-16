@@ -84,6 +84,8 @@ libmd_la_SOURCES = $(A2LIB_HFILES) $(A2LIB_OBJECTS)
 mod_md_la_CPPFLAGS = -g -I../src -std=c99 -D_GNU_SOURCE -Werror @WERROR_CFLAGS@
 mod_md_la_LDFLAGS  = -module -L../src -lmd -ljansson -lcurl -lssl -lcrypto -export-symbols-regex md_module
 
+BUILT_SOURCES = \
+    md_git_version.h
 
 OBJECTS = \
     mod_md_config.c \
@@ -101,6 +103,9 @@ HFILES = \
     mod_md_status.h \
     mod_md_private.h \
     mod_md.h
+
+md_git_version.h:
+	@./make_gitversion.sh
 
 mod_md_la_SOURCES = $(HFILES) $(OBJECTS) libmd.la
 

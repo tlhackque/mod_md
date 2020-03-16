@@ -34,6 +34,7 @@ missing
 stamp-h1
 Makefile.in
 Makefile
+md_git_version.h
 mod_md-*.tar.gz
 m4
 .cache
