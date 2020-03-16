@@ -676,7 +676,7 @@ static apr_status_t update_directory(const md_http_response_t *res, void *data)
     md_log_perror(MD_LOG_MARK, MD_LOG_TRACE1, 0, req->pool, "directory lookup response: %d", res->status);
     if (res->status == 503) {
         md_result_printf(result, APR_EAGAIN,
-            "The ACME server at <%s> reports that Service is Unavailable (503). This "
+            "The ACME server at &lt;%s&gt; reports that Service is Unavailable (503). This "
             "may happen during maintenance for short periods of time.", acme->url); 
         md_result_log(result, MD_LOG_INFO);
         rv = result->status;
@@ -684,7 +684,7 @@ static apr_status_t update_directory(const md_http_response_t *res, void *data)
     }
     else if (res->status < 200 || res->status >= 300) {
         md_result_printf(result, APR_EAGAIN,
-            "The ACME server at <%s> responded with HTTP status %d. This "
+            "The ACME server at &lt;%s&gt; responded with HTTP status %d. This "
             "is unusual. Please verify that the URL is correct and that you can indeed "
             "make request from the server to it by other means, e.g. invoking curl/wget.", 
             acme->url, res->status);
@@ -738,7 +738,7 @@ static apr_status_t update_directory(const md_http_response_t *res, void *data)
     
     if (MD_ACME_VERSION_UNKNOWN == acme->version) {
         md_result_printf(result, APR_EINVAL,
-            "Unable to understand ACME server response from <%s>. "
+            "Unable to understand ACME server response from &lt;%s&gt;. "
             "Wrong ACME protocol version or link?", acme->url); 
         md_result_log(result, MD_LOG_WARNING);
         rv = result->status;
@@ -775,7 +775,7 @@ apr_status_t md_acme_setup(md_acme_t *acme, md_result_t *result)
     if (APR_SUCCESS != rv && APR_SUCCESS == result->status) {
         /* If the result reports no error, we never got a response from the server */
         md_result_printf(result, rv, 
-            "Unsuccessful in contacting ACME server at <%s>. If this problem persists, "
+            "Unsuccessful in contacting ACME server at &lt;%s&gt;. If this problem persists, "
             "please check your network connectivity from your Apache server to the "
             "ACME server. Also, older servers might have trouble verifying the certificates "
             "of the ACME server. You can check if you are able to contact it manually via the "
