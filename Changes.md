@@ -56,11 +56,11 @@ MDManageGUI on
   Require ip 2001:0db8::42:42 203.0.113.242
 </Location>
 
-$ htpasswd -c /etc/httpd/md-badname/passwords mod_md_user
+$ htpasswd -c /etc/httpd/md/passwords mod_md_user
 New password:
 Re-type new password:
 Adding password for user mod_md_user
-$ chmod o=,g=r /etc/httpd/md-badname/passwords; chown root.apache /etc/httpd/md/passwords
+$ chmod o=,g=r /etc/httpd/md/passwords; chown root.apache /etc/httpd/md/passwords
 
 # If you use SeLinux:
 $ semanage port -a -t http_port_t -p tcp 280
@@ -76,7 +76,7 @@ Of course, you would specify your own trusted IP addresses, and might also want
 to add stronger authentication.  Users must be allowed both **GET** and **POST**.
 
 You **must** have some form of authentication enabled for the GUI.  If no authentication
-is configured, all of the GUI URLs will return "METHOD NOT ALLOWED".
+is configured, all of the GUI URLs will return "Service Uavailable".
 
 The URI space under the &lt;Location&gt; that you choose is managed by `mod_md`
 and should have the same authentication.  Specifically, `path_info` is used to
