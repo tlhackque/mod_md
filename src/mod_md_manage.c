@@ -188,7 +188,8 @@ static int md_manage_get_console( request_rec *r,  const md_mod_conf_t *mc, cons
     ap_get_server_revision(&server_version);
     apr_brigade_puts(bb, NULL, NULL,
                      "<!DOCTYPE html>"
-                     "<html><head><title>Managed domain administration</title>");
+                     "<html><head><title>Managed domain administration</title>"
+                     "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">");
     apr_brigade_printf(bb, NULL, NULL, 
                        "<link rel=\"stylesheet\" type=\"text/css\" href=\"%s\">",
                        ap_escape_quotes(r->pool, MD_JQUERYUI_CSS_URL));
@@ -198,13 +199,16 @@ static int md_manage_get_console( request_rec *r,  const md_mod_conf_t *mc, cons
                            ap_escape_quotes(r->pool, mc->manage_gui_stylesheet) );
     } else {
         apr_brigade_printf(bb, NULL, NULL, 
-                       "<link rel=\"stylesheet\" type=\"text/css\" href=\"%s/css\">",
+                       "<link rel=\"stylesheet\" type=\"text/css\" href=\"%s/css.css\">",
                            ap_escape_quotes(r->pool, r->parsed_uri.path) );
     }
     apr_brigade_printf(bb, NULL, NULL, 
-                       "<script src=\"%s\"></SCRIPT>"
-                       "<script src=\"%s\"></SCRIPT>"
-                       "<script src=\"%s/js\"></script>",
+                       "<script src=\"%s\"></script>"
+                       "<script src=\"%s\"></script>"
+                       /* Only flags jQueryUI issues.
+                         "<script src=\"https://code.jquery.com/jquery-migrate-3.2.0.js\"></script>"
+                       */
+                       "<script src=\"%s/js.js\"></script>",
                        ap_escape_quotes(r->pool, MD_JQUERY_URL),
                        ap_escape_quotes(r->pool, MD_JQUERYUI_URL),
                        ap_escape_quotes(r->pool, r->parsed_uri.path));
@@ -238,9 +242,10 @@ static int md_manage_get_console( request_rec *r,  const md_mod_conf_t *mc, cons
                        r->user? r->user : "Unknown",
                        ap_get_useragent_host(r, REMOTE_NAME, NULL), a? a : "Unknown");
     apr_brigade_puts(bb, NULL, NULL,
-                     "</p><button id=\"clearmsg\" class=\"messages hidden\">clear messages</buttom></div>"
+                     "</p><button id=\"clearmsg\" class=\"messages hidden\">clear messages</button></div>"
                      "<div id=\"messages\" class=\"messages hidden\">&nbsp;</div></div>"
                      "<div class=\"pagebody\">"
+                     "<noscript><div class=\"noscript\">This page requires javascript</div></noscript>"
                      "<form method=\"post\" id=\"certform\"><input type=\"hidden\" name=\"function\">"
                      "<table class=\"crtlist\">"
                      "<thead><tr><th><label for=\"selectall\"></label><input type=\"checkbox\" id=\"selectall\" "
@@ -248,7 +253,6 @@ static int md_manage_get_console( request_rec *r,  const md_mod_conf_t *mc, cons
                      "<th>Certificate</th><th>Names</th><th>Keys</th><th>Status</th><th>Validity period</th>"
                      "<th>CA</th><th>Activity</th></tr></thead>"
                      "<tbody id=\"domains\">"
-                     "<noscript><tr><td colspan=\"99\" class=\"noscript\">This page requires javascript</noscript></td></tr>"
                      "<tr><td colspan=\"99\" class=\"comfort\">Retrieving data&hellip;</td></tr>" /* Note: keep synched with JS */
                      "</tbody>"
                      "<tfoot><tr><td colspan=\"99\" class=\"certend\"><table class=\"actions\"><tbody>"

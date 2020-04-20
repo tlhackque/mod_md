@@ -114,13 +114,13 @@ typedef struct {
 
 static get_data_t datadesc[] = {
 #ifdef MD_MANAGE_DEBUG_JS
-    debug_file( /js, MD_MANAGE_DEBUG_JS, js_data )
+    debug_file( /js.js, MD_MANAGE_DEBUG_JS, js_data )
 #endif
-    txt_file( /css,   text/css,               css_data,   @@CSS_LM@@,   @@CSS_ET@@ )
-    txt_file( /js,    application/javascript, js_data,    @@JS_LM@@,    @@JS_ET@@ )
-    bin_file( /logo,  image/png,              logo_data,  @@LOGO_LM@@,  @@LOGO_ET@@ )
+    txt_file( /css.css, text/css,               css_data,   @@CSS_LM@@,   @@CSS_ET@@ )
+    txt_file( /js.js,   application/javascript, js_data,    @@JS_LM@@,    @@JS_ET@@ )
+    bin_file( /logo,    image/png,              logo_data,  @@LOGO_LM@@,  @@LOGO_ET@@ )
 #if 0
-    bin_file( /icons, image/png,              icons_data, @@ICONS_LM@@, @@ICONS_ET@@ )
+    bin_file( /icons,   image/png,              icons_data, @@ICONS_LM@@, @@ICONS_ET@@ )
 #endif
 };
 

@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-$( function() {
+jQuery(function($) {
        $.fn.serializeObject = function(name,data) {
            var o = {};
            var a = this.serializeArray();
@@ -68,7 +68,8 @@ $( function() {
            return true;
        },
        makebuttons = function(list) {
-           for( var b of list ) {
+           var b;
+           for( b of list ) {
                var sel = b.name.map(function(v,i,a){ return "button[name=\"" + v + "\"]";})
                .join(",");
                $(sel)
@@ -591,4 +592,5 @@ $( function() {
                                   return false;
                               });
       refreshCerts(1);
-   });
+      return true;
+});

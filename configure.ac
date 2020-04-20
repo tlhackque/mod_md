@@ -78,7 +78,7 @@ AC_ARG_WITH([boulder-dir], [AS_HELP_STRING([--with-boulder-dir], [Use boulder fr
     [request_boulder_dir=$withval], [request_boulder_dir=def])
 
 AC_ARG_WITH([jQuery], [AS_HELP_STRING([--with-jQuery], [URL of jQuery])],
-    [jq_url="$with_jQuery"], [jq_url=https://code.jquery.com/jquery-3.4.1.min.js])
+    [jq_url="$with_jQuery"], [jq_url=https://code.jquery.com/jquery-3.5.0.min.js])
 AC_SUBST(JQUERY_URL,["$jq_url"])
 
 AC_ARG_WITH([jQueryUI], [AS_HELP_STRING([--with-jQueryUI], [URL of jQueryUI])],
