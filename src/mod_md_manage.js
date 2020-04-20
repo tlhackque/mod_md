@@ -37,7 +37,7 @@ $( function() {
            return o;
        };
        var
-       ajaxTimeout = 60*1000,
+       ajaxTimeout = 75*1000,
        meta = {},
        kmeta = { termsOfService: "Terms of Service",
                  website: "Website",
@@ -109,6 +109,8 @@ $( function() {
                          updatePaging($("#pagelist"),data.paging);
                      }
                      displayMessageJSON(data);
+                     /* DEBUG: */
+                     displayMessageText(JSON.stringify(data));
                      return true;
                  })
            .fail(function( xhr, status ) {
@@ -338,7 +340,7 @@ $( function() {
                       $(form).find("input[type=\"hidden\"][name=\"host\"]").val($(this).val());
                       var postdata = $(form).serializeObject();
                       var ports = [];
-                      $("select.portsel option:selected")
+                      $(form).find("select.portsel option:selected")
                           .each(function(idx) {
                                     ports.push( { num:$(this).val(), name:$(this).text()} );
                                     return true;

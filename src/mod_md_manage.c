@@ -563,7 +563,7 @@ static int add_md_mrow(void *baton, apr_size_t index, md_json_t *mdj)
             WT apr_psprintf(ctx->p, "<li><button type=\"button\" class=\"host\" value=\"%s\" title=\"%s\">%s</button></li>",
                             name, name, name);
         }
-        WT apr_psprintf(ctx->p, "</ul></div><div id=\"hostlist%"APR_SIZE_T_FMT"\" class=\"hostlist\"><ul class=\"horiz hostlist\">", index);
+        WT apr_psprintf(ctx->p, "</ul></div><div id=\"hostlist%"APR_SIZE_T_FMT"\" class=\"hostlist hidden\"><ul class=\"horiz hostlist\">", index);
         for( i = 0; i < dl->nelts; i++ ) {
             WT apr_psprintf(ctx->p, "<li>%s</li>", (const char *)APR_ARRAY_IDX(dl,i,void *));
         }
@@ -1064,29 +1064,32 @@ POSTHANDLER(queue_function) {
     ap_log_rerror(APLOG_MARK, APLOG_TRACE4, 0, r,
                   "manage GUI request:%s", req);
 
+
+    if( APR_SUCCESS != (rv = apr_sockaddr_info_get( &sa, "127.0.0.1", APR_INET,
+                             (apr_port_t)(mc->manage_gui_enabled & (apr_port_t)-1),
+                                                    0, r->pool )) ||
+        APR_SUCCESS != (rv = apr_socket_create( &sock, sa->family, SOCK_STREAM,
+                                                APR_PROTO_TCP, r->pool )) ) {
+        ap_log_rerror(APLOG_MARK, APLOG_TRACE5, rv, r, "Unable to create queuing socket");
+        goto respond;
+    }
+
     for( i = 0; i < 5; ++i ) {
         md_json_t *rs;
 
-        if( APR_SUCCESS != (rv = apr_sockaddr_info_get( &sa, "127.0.0.1", APR_INET,
-                                 (apr_port_t)(mc->manage_gui_enabled & (apr_port_t)-1),
-                                                        0, r->pool )) ||
-            APR_SUCCESS != (rv = apr_socket_create( &sock, sa->family, SOCK_STREAM,
-                                                    APR_PROTO_TCP, r->pool ))          ||
-            APR_SUCCESS != (rv = apr_socket_opt_set( sock, APR_SO_NONBLOCK, 1))        ||
-            APR_SUCCESS != (rv = apr_socket_timeout_set( sock, APR_USEC_PER_SEC * 2 )) ||
+        if( APR_SUCCESS != (rv = apr_socket_opt_set( sock, APR_SO_NONBLOCK, 1))                          ||
+            APR_SUCCESS != (rv = apr_socket_timeout_set( sock, APR_USEC_PER_SEC * MANAGE_LINK_TIMEOUT )) ||
             APR_SUCCESS != (rv = apr_socket_connect( sock, sa )) ) {
             ap_log_rerror(APLOG_MARK, APLOG_TRACE5, rv, r,
                   "manage server connection failed, will retry %s", req);
             apr_sleep( APR_USEC_PER_SEC );
             continue;
         }
-        if( APR_SUCCESS != (rv = apr_socket_opt_set( sock, APR_SO_NONBLOCK, 0))        ||
-            APR_SUCCESS != (rv = apr_socket_timeout_set( sock, APR_USEC_PER_SEC * 2 )) ||
+        if( APR_SUCCESS != (rv = apr_socket_opt_set( sock, APR_SO_NONBLOCK, 0))                          ||
+            APR_SUCCESS != (rv = apr_socket_timeout_set( sock, APR_USEC_PER_SEC * MANAGE_LINK_TIMEOUT )) ||
             APR_SUCCESS != (rv = md_manage_send_message(sock, link_key, req, msglen)) ) {
             ap_log_rerror(APLOG_MARK, APLOG_TRACE5, rv, r,
                           "manage server send failed, will retry:%s", req);
-
-            apr_socket_close( sock );
             apr_sleep( APR_USEC_PER_SEC );
             continue;
         }
@@ -1094,7 +1097,6 @@ POSTHANDLER(queue_function) {
             APR_SUCCESS != (rv = md_json_readd( &rs, r->pool, msg, msglen )) ) {
             ap_log_rerror(APLOG_MARK, APLOG_TRACE5, rv, r,
                   "manage server response body error:%s", req);
-            apr_socket_close( sock );
             break;
         }
         apr_socket_close( sock );
@@ -1105,8 +1107,10 @@ POSTHANDLER(queue_function) {
         return md_json_resp( r, OK, resp, NULL );
     }
 
+    apr_socket_close( sock );
     ap_log_rerror(APLOG_MARK, APLOG_TRACE4, rv, r,
                   "manage server not responding:%s", req);
+ respond:
     return md_json_resp( r, rv, resp, "Service not responding" );
 }
 

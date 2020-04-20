@@ -383,22 +383,23 @@ apr_status_t md_renew_start_watching(md_mod_conf_t *mc, server_rec *s, apr_pool_
         /* Get port here in case privileged */
         apr_port_t manage_port = (apr_port_t)(dctx->mc->manage_gui_enabled & (apr_port_t)-1);
 
-        if( !( APR_SUCCESS == (rv = apr_sockaddr_info_get(&dctx->m_sa, "127.0.0.1",
-                                                          APR_INET,
-                                                          manage_port,
-                                                          0, dctx->p)) &&
-               APR_SUCCESS == (rv = apr_socket_create(&dctx->m_lsock,
-                                                      dctx->m_sa->family, SOCK_STREAM,
-                                                      APR_PROTO_TCP, dctx->p)) &&
-               APR_SUCCESS == (rv = apr_socket_opt_set( dctx->m_lsock,
-                                                        APR_SO_NONBLOCK, 1)) &&
-               APR_SUCCESS == (rv = apr_socket_timeout_set( dctx->m_lsock, 0)) &&
-               APR_SUCCESS == (rv = apr_socket_opt_set( dctx->m_lsock,
-                                                        APR_SO_REUSEADDR, 1)) &&
-               APR_SUCCESS == (rv = apr_socket_bind( dctx->m_lsock, dctx->m_sa )) &&
-               APR_SUCCESS == (rv = apr_socket_listen( dctx->m_lsock,
-                                                       MANAGE_BACKLOG )) )) {
+        if( APR_SUCCESS != (rv = apr_sockaddr_info_get(&dctx->m_sa, "127.0.0.1",
+                                                       APR_INET,
+                                                       manage_port,
+                                                       0, dctx->p))            ||
+            APR_SUCCESS != (rv = apr_socket_create(&dctx->m_lsock,
+                                                   dctx->m_sa->family, SOCK_STREAM,
+                                                   APR_PROTO_TCP, dctx->p))    ||
+            APR_SUCCESS != (rv = apr_socket_opt_set( dctx->m_lsock,
+                                                     APR_SO_NONBLOCK, 1))      ||
+            APR_SUCCESS != (rv = apr_socket_timeout_set( dctx->m_lsock, 0))    ||
+            APR_SUCCESS != (rv = apr_socket_opt_set( dctx->m_lsock,
+                                                     APR_SO_REUSEADDR, 1))     ||
+            APR_SUCCESS != (rv = apr_socket_bind( dctx->m_lsock, dctx->m_sa))  ||
+            APR_SUCCESS != (rv = apr_socket_listen( dctx->m_lsock,
+                                                    MANAGE_BACKLOG )) ) {
             if( dctx->m_lsock ) apr_socket_close( dctx->m_lsock );
+            dctx->m_lsock = NULL;
             ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s, APLOGNO()
                          "manage server failed to open socket for 127.0.0.1 port %u - %s",
                          manage_port, APR_STATUS_IS_EACCES(rv)?
@@ -406,8 +407,13 @@ apr_status_t md_renew_start_watching(md_mod_conf_t *mc, server_rec *s, apr_pool_
                          "see mod_md and operating system documentation" );
             return rv;
         } else {
-            md_store_fs_get_manage_key(md_reg_store_get(mc->reg), dctx->m_link_key,
-                                       sizeof(dctx->m_link_key));
+            if( APR_SUCCESS != (rv = md_store_fs_get_manage_key(md_reg_store_get(mc->reg),
+                                                                dctx->m_link_key,
+                                                                sizeof(dctx->m_link_key))) ) {
+                ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s, APLOGNO()
+                             "manage server failed to obtain link key");
+                return rv;
+            }
         }
     }
 #endif

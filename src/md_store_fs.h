@@ -62,6 +62,6 @@ typedef apr_status_t md_store_fs_cb(void *baton, struct md_store_t *store,
                                     
 apr_status_t md_store_fs_set_event_cb(struct md_store_t *store, md_store_fs_cb *cb, void *baton);
 
-void md_store_fs_get_manage_key(md_store_t *store, unsigned char *buffer, const size_t len);
+apr_status_t md_store_fs_get_manage_key(md_store_t *store, unsigned char *buffer, const size_t len);
 
 #endif /* mod_md_md_store_fs_h */

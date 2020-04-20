@@ -41,6 +41,10 @@
 #define MSG_SIG_TYPE EVP_sha256()
 #define MSG_SIG_LEN (256/8)
 
+#ifndef TS_FUZZ
+#define TS_FUZZ (10 * APR_USEC_PER_SEC)
+#endif
+
 typedef struct {
     apr_size_t length;
     apr_time_t tstamp;
@@ -106,7 +110,7 @@ void process_gui_server_request( md_gui_server_ctx_t *ctx, apr_socket_t *lsock )
                   sa->hostname, sa->port );
 
     if( APR_SUCCESS != (rv = apr_socket_opt_set( sock, APR_SO_NONBLOCK, 0)) ||
-        APR_SUCCESS != (rv = apr_socket_timeout_set( sock, APR_USEC_PER_SEC * 2 )) ) {
+        APR_SUCCESS != (rv = apr_socket_timeout_set( sock, APR_USEC_PER_SEC * MANAGE_LINK_TIMEOUT )) ) {
         apr_socket_close(sock);
         return;
     }
@@ -206,19 +210,19 @@ GUIHANDLER(import_account) {
 
 apr_status_t md_manage_send_message(apr_socket_t *sock, const unsigned char *key,
                                     const char *body, apr_size_t length ) {
-    apr_status_t rv;
-    apr_size_t len;
+    apr_status_t      rv;
+    apr_size_t        len;
     link_msg_header_t msghdr;
     link_msg_sig_t    msgsig;
     HMAC_CTX         *macctx;
 
+    memset( &msghdr, 0, sizeof(msghdr) );
+    memset( &msgsig, 0, sizeof(msgsig) );
+    msghdr.length = length + sizeof(msgsig);
+    msghdr.tstamp = apr_time_now();
+
     macctx = HMAC_CTX_new();
     HMAC_Init_ex(macctx, (const void *)key, MANAGE_KEY_LENGTH, MSG_SIG_TYPE, NULL);
-
-
-    msghdr.length = length + sizeof(msgsig);
-
-    msghdr.tstamp = apr_time_now();
     HMAC_Update(macctx, (const void *)&msghdr, sizeof(msghdr));
     HMAC_Update(macctx, (const void *)body, length);
     HMAC_Final(macctx, msgsig, NULL);
@@ -230,9 +234,9 @@ apr_status_t md_manage_send_message(apr_socket_t *sock, const unsigned char *key
     len = sizeof( msghdr );
     if( APR_SUCCESS != (rv = apr_socket_send(sock, (char *)&msghdr, &len)) ||
         len != sizeof( msghdr ) || !(len = length) ||
-        APR_SUCCESS != (rv = apr_socket_send(sock, (char *)body, &len)) ||
+        APR_SUCCESS != (rv = apr_socket_send(sock, (char *)body, &len))    ||
         len != length || !(len = sizeof(msgsig)) ||
-        APR_SUCCESS != (rv = apr_socket_send(sock, (char *)msgsig, &len)) ||
+        APR_SUCCESS != (rv = apr_socket_send(sock, (char *)msgsig, &len))  ||
         len != sizeof(msgsig) ) {
         return (rv == APR_SUCCESS)? APR_EGENERAL : rv;
     }
@@ -242,43 +246,56 @@ apr_status_t md_manage_send_message(apr_socket_t *sock, const unsigned char *key
 apr_status_t md_manage_recv_message(apr_socket_t *sock, const unsigned char *key,
                                     const char **body, apr_size_t *length, apr_pool_t *p)
 {
-    apr_status_t      rv;
+    apr_status_t      rv = APR_SUCCESS;
     apr_time_t        now;
-    apr_size_t        len;
+    apr_size_t        len = 0, tlen;
     link_msg_header_t msghdr;
     link_msg_sig_t    msgsig;
     HMAC_CTX         *macctx;
 
-    macctx = HMAC_CTX_new();
-    HMAC_Init_ex(macctx, (const void *)key, MANAGE_KEY_LENGTH, MSG_SIG_TYPE, NULL);
-
+    memset( &msgsig, 0, sizeof(msgsig) );
     now = apr_time_now();
-#define FUZZ (10 * APR_USEC_PER_SEC)
-    len = sizeof( msghdr );
-    if( APR_SUCCESS != (rv = apr_socket_recv( sock, (char *)&msghdr, &len )) ||
-        len != sizeof( msghdr ) ||
-        msghdr.tstamp < now - FUZZ || msghdr.tstamp > now + FUZZ) {
-        return (rv == APR_SUCCESS? APR_EGENERAL : rv);
+
+    for( tlen = 0; tlen < sizeof( msghdr ); tlen += len ) {
+        len = sizeof( msghdr ) - tlen;
+        if( APR_SUCCESS != (rv = apr_socket_recv( sock, tlen + (char *)&msghdr, &len )) ||
+            len == 0 ) {
+            return (rv == APR_SUCCESS? APR_EOF : rv);
+        }
     }
-    HMAC_Update(macctx, (const void *)&msghdr, sizeof(msghdr));
 
     *body = (char *)apr_palloc( p, msghdr.length );
     *length = msghdr.length - sizeof(msgsig);
 
-    len = msghdr.length;
-    if( APR_SUCCESS != (rv = apr_socket_recv( sock, (char *)*body, &len )) ||
-        len != msghdr.length ) {
-        return (rv == APR_SUCCESS? APR_EGENERAL : rv);
+    for( tlen = 0; tlen < msghdr.length; tlen += len ) {
+        len = msghdr.length - tlen;
+        if( APR_SUCCESS != (rv = apr_socket_recv( sock, tlen + (char *)*body, &len ))   ||
+            len == 0 ) {
+            return (rv == APR_SUCCESS? APR_EOF : rv);
+        }
     }
-    HMAC_Update(macctx, (const unsigned char *)*body, *length);
-    HMAC_Final(macctx, msgsig, NULL);
+    if( !(macctx = HMAC_CTX_new()) ) {
+        return APR_ENOMEM;
+    }
+    if( !HMAC_Init_ex(macctx, (const void *)key, MANAGE_KEY_LENGTH, MSG_SIG_TYPE, NULL) ||
+        !HMAC_Update(macctx, (const void *)&msghdr, sizeof(msghdr))                     ||
+        !HMAC_Update(macctx, (const unsigned char *)*body, *length)                     ||
+        !HMAC_Final(macctx, msgsig, NULL) ) {
+        rv = APR_NOTFOUND;
+    }
 #if OPENSSL_VERSION_NUMBER < 0x0101000
     HMAC_CTX_cleanup(macctx);
 #else
     HMAC_CTX_free(macctx);
 #endif
+    if( rv != APR_SUCCESS ) {
+        return rv;
+    }
     if( memcmp(msgsig, *body + *length, sizeof(msgsig)) ) {
-        return APR_EGENERAL;
+        return APR_EMISMATCH;
+    }
+    if( msghdr.tstamp < now - TS_FUZZ || msghdr.tstamp > now + TS_FUZZ ) {
+        return APR_EBADDATE;
     }
     return APR_SUCCESS;
 }

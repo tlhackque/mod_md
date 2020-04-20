@@ -25,6 +25,10 @@ typedef struct md_json_t md_json_t;
 typedef struct apr_socket_t apr_socket_t;
 #include <apr_time.h>
 
+#ifndef MANAGE_LINK_TIMEOUT
+#define MANAGE_LINK_TIMEOUT (60)
+#endif
+
 typedef struct {
     apr_pool_t          *p;
     server_rec          *s;

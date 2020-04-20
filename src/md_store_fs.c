@@ -252,23 +252,39 @@ static apr_status_t read_store_file(md_store_fs_t *s_fs, const char *fname,
 #if MANAGE_GUI
 #include <openssl/evp.h>
 
-void md_store_fs_get_manage_key(md_store_t *store, unsigned char *buffer, const size_t len) {
+apr_status_t md_store_fs_get_manage_key(md_store_t *store, unsigned char *buffer, const size_t len) {
     EVP_MD_CTX *mdctx;
-    unsigned int rlen, i;
+    unsigned int rlen, i = 1;
     unsigned char rbuf[EVP_MAX_MD_SIZE];
 
     md_store_fs_t *s_fs = FS_STORE(store);
 
-    mdctx = EVP_MD_CTX_create();
-    EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL);
-    EVP_DigestUpdate(mdctx, (const void *)s_fs->key.data, (size_t)s_fs->key.len);
-    EVP_DigestFinal_ex(mdctx, rbuf, &rlen);
+#if OPENSSL_VERSION_NUMBER < 0x0101000
+    if( !(mdctx = EVP_MD_CTX_create()) ) {
+#else
+    if( !(mdctx = EVP_MD_CTX_new()) ) {
+#endif
+        return APR_ENOMEM;
+    }
+    if( !EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL)  ||
+        !EVP_DigestUpdate(mdctx, (const void *)s_fs->key.data, (size_t)s_fs->key.len) ||
+        !EVP_DigestFinal_ex(mdctx, rbuf, &rlen) ) {
+        i = 0;
+    }
+
+#if OPENSSL_VERSION_NUMBER < 0x0101000
     EVP_MD_CTX_destroy(mdctx);
+#else
+    EVP_MD_CTX_free(mdctx);
+#endif
+    if( !i ) {
+        return APR_NOTFOUND;
+    }
 
     for( i = 0; i < len; ++i ) {
         buffer[i] = rbuf[ i % rlen ];
     }
-    return;
+    return APR_SUCCESS;
 }
 #endif
 
