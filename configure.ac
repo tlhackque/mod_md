@@ -77,6 +77,34 @@ AC_ARG_WITH([openssl], [AS_HELP_STRING([--with-openssl], [Use openssl from this 
 AC_ARG_WITH([boulder-dir], [AS_HELP_STRING([--with-boulder-dir], [Use boulder from this directory])],
     [request_boulder_dir=$withval], [request_boulder_dir=def])
 
+AC_ARG_WITH([jQuery], [AS_HELP_STRING([--with-jQuery], [URL of jQuery])],
+    [jq_url="$with_jQuery"], [jq_url=https://code.jquery.com/jquery-3.4.1.min.js])
+AC_SUBST(JQUERY_URL,["$jq_url"])
+
+AC_ARG_WITH([jQueryUI], [AS_HELP_STRING([--with-jQueryUI], [URL of jQueryUI])],
+    [jqui_url="$with_jQueryUI"], [jqui_url=https://code.jquery.com/ui/1.12.1/jquery-ui.min.js])
+AC_SUBST(JQUERYUI_URL,["$jqui_url"])
+
+AC_ARG_WITH([jQueryUITheme], [AS_HELP_STRING([--with-jQueryUITheme], [URL of jQueryUI theme's CSS])],
+    [jquicss_url="$with_jQueryUITheme"], [jquicss_url=https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css])
+AC_SUBST(JQUERYUICSS_URL,["$jquicss_url"])
+
+AC_ARG_ENABLE([system-dns-servers],AS_HELP_STRING([--enable-system-dns-servers],[Enables use of the DNS servers configured by the operating system for management queries.The default public servers are often a better choice.]))
+AS_IF([test "x$enable_system_dns_servers" = "xyes"],[system_dns=$enableval], [system_dns=no])
+AS_IF([test "x$system_dns" = "xyes"],[AC_SUBST([USE_SYSTEM_DNS_SERVERS],[1])],[AC_SUBST([USE_SYSTEM_DNS_SERVERS],[0])])
+
+AC_ARG_WITH([resolv-conf], [AS_HELP_STRING([--with-resolv-conf], [Alternate file to /etc/resolv.conf if --enable-system-dns-servers])],
+    [DNSQ_RESOLV_CONF="$with_resolv_conf"], [DNSQ_RESOLV_CONF="/etc/resolv.conf"])
+AC_SUBST(DNSQ_RESOLV_CONF)
+
+AC_ARG_WITH([public-dns], [AS_HELP_STRING([--with-public-dns], [Public DNS servers to use as default, last resort, and --disable-system-dns-servers])],
+    [DNSQ_PUBLIC_NAMESERVERS="$with_public_dns"], [DNSQ_PUBLIC_NAMESERVERS="8.8.8.8,9.9.9.9,1.1.1.1,[2001:4860:4860::8888],2620:fe::fe,[2606:4700:4700::1111]"])
+AC_SUBST(DNSQ_PUBLIC_NAMESERVERS)
+
+AC_ARG_WITH([debug-js], [AS_HELP_STRING([--with-debug-js], [URI for debugging management GUI javascript.])],
+    [AC_SUBST(MANAGE_DEBUG_JS,["#define MD_MANAGE_DEBUG_JS \"$with_debug_js\""])AC_SUBST(MANAGE_DEBUG_DATA,["#define MD_MANAGE_DEBUG_DATA 1"])],)
+
+AC_SUBST([MOD_MD_CONFIGURE_ARGS],["$ac_configure_args"])
 
 SERVER_NAME=$(hostname -f)
 AC_SUBST(SERVER_NAME)
@@ -161,7 +189,11 @@ AC_PATH_PROG([PKGCONFIG], [pkg-config])
 ACME_DEFv1_URL=https://acme-v01.api.letsencrypt.org/directory
 AC_SUBST(ACME_DEFv1_URL)
 
-ACME_DEF_URL=https://acme-v02.api.letsencrypt.org/directory
+AC_ARG_WITH([default-ca-name], [AS_HELP_STRING([--with-default-ca-name], [Descriptive name of default Certificate Authority])],
+    [ACME_DEF_CA_NAME="$with_default_ca_name"], [ACME_DEF_CA_NAME="Let's Encrypt"])
+AC_SUBST(ACME_DEF_CA_NAME)
+AC_ARG_WITH([default-ca], [AS_HELP_STRING([--with-default-ca], [URL of default Certificate Authority's ACME directory])],
+    [ACME_DEF_URL="$with_default_ca"], [ACME_DEF_URL=https://acme-v02.api.letsencrypt.org/directory])
 AC_SUBST(ACME_DEF_URL)
 
 if test "x$request_boulder" = "xdef"; then
@@ -299,7 +331,214 @@ AC_TRY_COMPILE([#include <curl/curlver.h>],[
 if test x"$curl_version_ok" = "x"; then
     AC_MSG_ERROR([curl from $curl_config must be at least version 7.50.])
 fi
-
+AC_CHECK_FUNCS([gethostname])
+AC_CHECK_HEADERS([limits.h unistd.h Winsock2.h])
+AC_DEFUN([MD_CURL_CA_CHECK],
+[AC_CACHE_CHECK(
+ [for Curls default trusted CA certificate locations],
+ [md_cv_curl_ca_locations],[dnl
+ AC_RUN_IFELSE([dnl
+        AC_LANG_PROGRAM(
+                [[#include <ctype.h>
+#ifdef HAVE_LIMITS_H
+#include <limits.h>
+#endif
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#ifdef HAVE_GETHOSTNAME
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#elif defined HAVE_WINSOCK2_H
+#include <Winock2.h>
+#endif
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 255
+#endif
+#endif
+#include <curl/curl.h>
+static char *urls[] = {
+    NULL, NULL,
+    "https://localhost/",
+    "https://127.0.0.1/",
+    "https://[::1]/",
+    "https://letsencrypt.org/",
+    "https://www.google.com/",
+};
+static struct {
+    const char *const key;
+    const char *varname;
+    const char *value;
+} wanted[] = {
+    {
+        "CAfile",
+        "MD_TRUSTEDCAFILE",
+        NULL,
+    }, {
+        "CApath",
+        "MD_TRUSTEDCAPATH",
+        NULL,
+    },
+};
+static
+int done(void) {
+    size_t i, n = 0;
+    for( i = 0; i < sizeof(wanted)/sizeof(wanted[0]); ++i ) {
+        if( wanted[i].value ) ++n;
+    }
+    return n >= 1;
+}
+static char *buf = NULL;
+static size_t bufsize = 0;
+static
+int addtxt(CURL *handle, curl_infotype type,
+            char *data, size_t size,
+            void *userp) {
+    char *p;
+    (void)handle;
+    (void)userp;
+    if( type != CURLINFO_TEXT || size == 0 ) return CURLE_OK;
+    p = realloc( buf, bufsize + size +1 );
+    if( !p ) {
+        printf( "Out of memory!\n" );
+        exit(1);
+    }
+    buf = p;
+    memcpy( p + bufsize, data, size );
+    bufsize += size;
+    return CURLE_OK;
+}
+static void scantext( char *buf, size_t size ) {
+    char *p;
+    ptrdiff_t len, llen = 1;
+    size_t i;
+    buf[size] = '\0';
+    for( ;size; buf += llen, size -= llen) {
+        p = strchr( buf, '\n' );
+        if( !p ) p = buf +size;
+        *p++ = '\0';
+        for( ; size; --size, ++buf ) {
+            if( !isspace( *buf ) ) break;
+        }
+        llen = p - buf;
+        p = strchr( buf, ':' );
+        if( !p ) continue;
+        *p++ = '\0';
+        while( *p && isspace(*p) ) {
+            ++p;
+        }
+        if( !strcmp( p, "none" ) ) continue;
+        for( i = 0; i < sizeof(wanted)/sizeof(wanted[0]); i++ ) {
+            if( strcmp( wanted[i].key, buf ) ) continue;
+            if( (len = llen - (p - buf)) && !wanted[i].value ) {
+                char *ip;
+                ip = malloc( len +1 );
+                if( !ip ) {
+                    printf( "Out of memory!\n" );
+                    exit(1);
+                }
+                memcpy( ip, p, len );
+                ip[len] = '\0';
+                wanted[i].value = ip;
+            }
+            break;
+        }
+    }
+    return;
+}
+static
+size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
+    (void)ptr;
+    (void)nmemb;
+    (void)userdata;
+    return nmemb * size;
+}
+]],[[    CURL *curl;
+    size_t u;
+    struct { /* Ver 6 of curl_version_info_data */
+      CURLversion age;
+      const char *version;
+      unsigned int version_num;
+      const char *host;
+      int features;
+      const char *ssl_version;
+      long ssl_version_num;
+      const char *libz_version;
+      const char * const *protocols;
+      const char *ares;
+      int ares_num;
+      const char *libidn;
+      int iconv_ver_num;
+      const char *libssh_version;
+      unsigned int brotli_ver_num;
+      const char *brotli_version;
+      unsigned int nghttp2_ver_num;
+      const char *nghttp2_version;
+      const char *quic_version;
+      const char *cainfo;
+      const char *capath;
+    } *curlvi;
+    curl = curl_easy_init();
+    if(!curl) exit(1);
+    curlvi = curl_version_info( CURLVERSION_NOW );
+    if( curlvi && curlvi->age >= 6 ) {
+        wanted[0].value = curlvi->cainfo;
+        wanted[1].value = curlvi->capath;
+    } else {
+#ifdef HAVE_GETHOSTNAME
+#define H_OFS sizeof("https://")
+#define W_OFS sizeof("https://www.")
+        char hostname[W_OFS+HOST_NAME_MAX+1+1] = { "https://www." };
+        if( !gethostname( hostname+W_OFS, HOST_NAME_MAX ) ) {
+            hostname[sizeof(hostname)-1]='\0';
+            urls[0] = malloc( strlen( hostname ) + 1 );
+            if( urls[0] ) strcpy( urls[0], hostname );
+            memmove( hostname+H_OFS, hostname+W_OFS, strlen(hostname+W_OFS)+1 );
+            urls[1] = malloc( strlen( hostname ) + 1 );
+            if( urls[1] ) strcpy( urls[1], hostname );
+        }
+#endif
+        curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, addtxt);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 5000L);
+        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+        for( u = 0; u < sizeof(urls)/sizeof(urls[0]); ++u ) {
+            if( !urls[u] ) continue;
+            curl_easy_setopt(curl, CURLOPT_URL, urls[u]);
+            (void) curl_easy_perform(curl);
+            scantext( buf, bufsize );
+            free( buf );
+            buf = NULL;
+            bufsize = 0;
+            if( done() ) break;
+        }
+    }
+    for( u = 0; u < sizeof(wanted)/sizeof(wanted[0]); ++u ) {
+        fprintf( stderr, "%s%s=", (u?" ":""), wanted[u].varname );
+        if( wanted[u].value ) {
+            fprintf( stderr, "\"\\\\\"%s\\\\\"\"", wanted[u].value );
+        } else {
+            fprintf( stderr, "NULL" );
+        }
+    }
+    curl_easy_cleanup(curl);
+    exit( !done() );
+]])],
+        [md_cv_curl_ca_locations=$(./conftest$EXEEXT 2>&1)],
+        [AC_MSG_ERROR(Failed to compile or run curl CA locations test program!?)],
+        [AC_MSG_WARN(Unable to probe libcurl for CA locations when cross-compiling.  Set MD_TRUSTEDCAPATH and MDTRUSTEDCAFILE in CPPFLAGS, or the md_cv_curl_ca_locations cache variable.)])
+])
+eval "$md_cv_curl_ca_locations"
+AC_SUBST(MD_TRUSTEDCAFILE)
+AC_SUBST(MD_TRUSTEDCAPATH)
+m4_pattern_allow(MD_TRUSTEDCAFILE)
+m4_pattern_allow(MD_TRUSTEDCAPATH)
+])
+MD_CURL_CA_CHECK
 
 if test x"$request_openssl" = "xcheck"; then
     OPENSSL_BIN="${prefix}/bin/openssl"
@@ -421,7 +660,13 @@ AC_MSG_NOTICE([summary of build options:
     CPPFLAGS:       ${CPPFLAGS}
     curl            ${CURL_BIN:--}
     curl-config     ${curl_config:--}
+    Trusted CA file ${MD_TRUSTEDCAFILE}
+    Trusted CA path ${MD_TRUSTEDCAPATH}
     jansson         ${JANSSON_PREFIX:--}
     openssl         ${OPENSSL_BIN:--}
+    default ACME CA ${ACME_DEF_CA_NAME} (${ACME_DEF_URL})
     boulder         ${BOULDER_DIR} (${BOULDER_URL})
+    jQuery          $jq_url
+    jQueryUI        $jqui_url
+    jQueryUI Theme  $jquicss_url
 ])

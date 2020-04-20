@@ -71,7 +71,7 @@ static md_cmd_t AddCmd = {
 static apr_status_t cmd_remove(md_cmd_ctx *ctx, const md_cmd_t *cmd) 
 {
     const char *name;
-    apr_status_t rv;
+    apr_status_t rv = 0;
     int i;
 
     if (ctx->argc <= 0) {

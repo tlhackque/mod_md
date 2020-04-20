@@ -1,0 +1,176 @@
+/* -*- c -*- */
+/* Copyright (C) 2020 Timothe Litt
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* Out-of-the-way large built-in text served by the ManageGUI handler.
+ *
+ * NOTE: ***** The file to edit is mod_md_manage_data.c.in.
+ *
+ * The data is built from readable .js and .css files, and a normal .png file.
+ * The variables below are built with the make_manage_data.sh script.
+ */
+
+#include <stddef.h>
+
+#include <httpd.h>
+#include <http_core.h>
+#include <http_protocol.h>
+#include <http_request.h>
+
+#include <apr.h>
+#include <apr_time.h>
+#include <apr_date.h>
+#include <apr_strings.h>
+
+#include "md.h"
+#include "md_version.h"
+#include "mod_md_config.h"
+
+#include "mod_md_manage_data.h"
+
+/* Tokens are replaced with data.  The entire line containing
+ * the token is deleted.
+ */
+static const char css_data[] = {
+    @@CSS_DATA@@
+}; /* ***End CSS Data*** */
+
+static const char js_data[] = {
+    @@JS_DATA@@
+}; /* ***End JS Data*** */
+
+static unsigned const char logo_data[] = {
+    @@LOGO_DATA@@
+}; /* ***End Logo Data*** */
+
+#if 0
+static unsigned const char icons_data[] = {
+    @@ICONS_DATA@@
+}; /* ***End Icons Data*** */
+#endif
+
+/* Non-null path info in a GET request for md-manage.
+ * Return compiled-in data.  For internal use; not
+ * documented and may change at any point.
+ *
+ * This allows the browsers to cache the data, while
+ * still not requiring packaging and setup of separate
+ * files on disk.
+ */
+
+/* Descriptor: path-info, Content-Type, pData, data-size,
+ *             Last-Modified, ETag.
+ *
+ * lastModified comes from the source file via make_manage_data.sh.
+ *              (If it can't be determined, the merge date is used.)
+ * The ETag is a simple SHA-1 hash of the source file.  
+ *
+ * In the descriptor, space is allocated for the \0', as well as
+ * the quotes required for ETags.
+ *
+ * Note that for text data, we do NOT serve the \0 at the end of the
+ * stored data.  For binary data, every byte is served.
+ *
+ * Debug entries (for developers) must go first in the descriptor table.
+ * It is intentional that the built-in code is also compiled.  This
+ * avoids problems when debug is over, and minimizes conditional code.
+ */
+
+typedef struct {
+    const char *const pi;      /* "/foo" */
+    const char *const ct;      /* "text/css" */
+    const char *const data;
+    const size_t size;
+    const char lastmod[29+1];  /* "Tue, 07 Apr 2020 17:19:36 GMT" */
+    const char etag[1+40+1+1]; /* "\"5fecf39363e2fd810f726b0ee672fb3767ab5bde\"" */
+} get_data_t;
+
+/* Directory */
+
+#define txt_file( _pi, _ct, _data, _lm, _et )                           \
+    { #_pi, #_ct, (_data), sizeof(_data) -1,            { _lm }, { _et } },
+
+#define bin_file(  _pi, _ct, _data, _lm, _et )                          \
+    { #_pi, #_ct, (const char *)(_data), sizeof(_data), { _lm }, { _et } },
+
+#ifdef MD_MANAGE_DEBUG_DATA
+#define debug_file( _pi, _uri, _data )                                  \
+    { #_pi, (_uri), (const char *)(_data), 0,           { "" },  {""} },
+#endif
+
+static get_data_t datadesc[] = {
+#ifdef MD_MANAGE_DEBUG_JS
+    debug_file( /js, MD_MANAGE_DEBUG_JS, js_data )
+#endif
+    txt_file( /css,   text/css,               css_data,   @@CSS_LM@@,   @@CSS_ET@@ )
+    txt_file( /js,    application/javascript, js_data,    @@JS_LM@@,    @@JS_ET@@ )
+    bin_file( /logo,  image/png,              logo_data,  @@LOGO_LM@@,  @@LOGO_ET@@ )
+#if 0
+    bin_file( /icons, image/png,              icons_data, @@ICONS_LM@@, @@ICONS_ET@@ )
+#endif
+};
+
+/* Handler */
+
+apr_status_t md_manage_get_data( request_rec *r, const md_mod_conf_t *mc,
+                                 const md_srv_conf_t *sc )
+{
+    apr_status_t rv;
+    size_t i;
+    get_data_t *dp;
+    apr_bucket_brigade *bb;
+
+    (void)mc;
+    (void)sc;
+
+    for( i = 0, dp = datadesc; i < sizeof( datadesc ) / sizeof( datadesc[0] );
+         ++i, ++dp ) {
+        if( !strcmp( r->path_info, dp->pi ) ) {
+
+#ifdef MD_MANAGE_DEBUG_DATA
+            if( dp->size == 0 ) {
+                ap_internal_redirect( dp->ct, r );
+                return DECLINED;
+            }
+#endif
+            ap_set_content_length(r, (apr_off_t)dp->size);
+            ap_set_content_type( r, dp->ct );
+
+            /* Conditional GET - Last-Modified && ETag */
+
+            r->finfo.filetype = APR_NOFILE;
+            if( dp->lastmod[0] ) {
+                ap_update_mtime( r, apr_date_parse_http(dp->lastmod) );
+                ap_set_last_modified(r);
+            }
+            if( dp->etag[0] ) apr_table_set(r->headers_out, "ETag", dp->etag);
+
+            if( (rv = ap_meets_conditions(r)) != OK ) {
+                return rv;
+            }
+
+            if( !r->header_only ) {
+                bb = apr_brigade_create(r->pool, r->connection->bucket_alloc);
+                apr_brigade_write(bb, NULL, NULL, dp->data, dp->size);
+                ap_pass_brigade(r->output_filters, bb);
+                apr_brigade_destroy(bb);
+            }
+            return OK;
+        }
+    }
+    return HTTP_NOT_FOUND;
+}

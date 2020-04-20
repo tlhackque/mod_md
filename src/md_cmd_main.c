@@ -41,6 +41,14 @@
 #include "md_cmd_store.h"
 #include "md_curl.h"
 
+/* Called by md_curl to get the trusted CA pathse.  Could add a command
+ * option to set these...
+ */
+void md_config_get_trusted( const char **certfile, const char **certpath )
+{
+    if( *certfile ) *certfile = NULL;
+    if( *certpath ) *certpath = NULL;
+}
 
 /**************************************************************************************************/
 /* command infrastructure */

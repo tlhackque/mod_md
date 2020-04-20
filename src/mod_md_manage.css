@@ -1,0 +1,313 @@
+/* -*- mode: css; -*-
+ * Copyright (C) 2020 Timothe Litt.  Apache licensed, see source.
+ */
+/* Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+a {
+    text-decoration: underline;
+    cursor: pointer;
+}
+tr.pagenav li.active a {
+    text-decoration: none;
+    cursor: default;
+}
+a:hover {
+    text-decoration: none;
+}
+.hidden,
+.ui-button.hidden {
+    display: none;
+}
+body {
+background-color: #c5bd73;
+    background-size: 100% 125px;
+    background-repeat: no-repeat;
+    background-image: -moz-linear-gradient(#8c8a77, #c5bd73);
+    background-image: -webkit-linear-gradient(#8c8a77, #c5bd73);
+    background-image: -ms-linear-gradient(#8c8a77, #c5bd73);
+    background-image: linear-gradient(#8c8a77, #c5bd73);
+}
+div.pagewrapper {
+    margin: 10px;
+    padding:10px;
+    width: max-content;
+}
+div.pageheader div.headertext {
+    float:left;
+    margin-left:20px;
+    display:inline-block;
+}
+div.pageheader h1 {
+    text-align:center;
+    vertical-align:text-top;
+    display:inline-block;
+}
+div.pageheader img.logo {
+    float:left;
+    margin: 0px 0px 15px 0px;
+    opacity: 50%;
+}
+div.messages {
+    clear:left;
+    border: 2px solid white;
+    border-radius: 8px;
+    padding: 10px;
+    max-height: 200px;
+    overflow: auto;
+}
+table.actions {
+    margin-top: -3px;
+    width: 100%;
+    border-top:3px solid white;
+    background-color: lightgray;
+    border-collapse: collapse;
+}
+table.actions tbody tr td:first-child {
+    font-weight: bold;
+}
+#clearmsg,
+table.actions .ui-button,
+table.accountinfo .ui-button {
+    font-size: 90%;
+    border-radius: 20px;
+    border-style: outset;
+    -webkit-border-radius: 20px;
+    -moz-border-radius: 20px;
+}
+p.notes {
+    font-size: small;
+}
+p.notes span.quote {
+    font-weight: bold;
+    font-style: italic;
+}
+table.crtlist {
+    margin-top: 30px;
+    margin-left: 10px;
+    padding: 2px;
+    min-width: 650px;
+    max-width: 1000px;
+    border: solid 3px white;
+    border-radius: 8px;
+    border-spacing: 0px;
+    -webkit-border-radius: 8px;
+    -moz-border-radius: 8px;
+}
+table.crtlist thead tr,
+table.crtlist tbody tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+table.crtlist tr.domain td:first-child,
+table.crtlist thead tr th:first-child  {
+    width: 50px;
+    text-align:center;
+}
+table.crtlist td.exp.far {
+    color: black;
+}
+table.crtlist td.exp.near {
+    color: orange;
+    font-weight: bold;
+}
+table.crtlist td.exp.expired {
+    color: red;
+    font-weight: bold;
+}
+table.crtlist tfoot tr td.certend {
+    border-top: 3px solid white;
+}
+table.crtlist thead tr th,
+table.crtlist tbody tr td:not(:first-child):not(.dnames) {
+    padding-left: 5px;
+    padding-right:5px;
+}
+table.crtlist td.dnames {
+    text-align: right;
+    padding-left: 5px;
+    padding-right: 15px;
+}
+div.ui-tooltip {
+    max-width: 50%;
+    background-color: #ffffe0;
+}
+ul.hostlist.horiz li {
+    padding: 1px 5px;
+}
+
+table.crtlist td.dkeys {
+    min-width: 80px;
+}
+table.crtlist td.dvalid {
+    font-family: monospace;
+    min-width: 210px;
+    text-align: center;
+}
+table.crtlist td.dvalid span.nodates {
+    font-weight: bold;
+}
+table.crtlist>tbody tr:last-child td {
+   border-bottom: 3px solid white;
+}
+td.nocerts {
+    font-size:125%;
+    font-color: #ff0000;
+    font-weight: bold;
+    text-align: center;
+}
+td.comfort {
+    font-size: 125%;
+    font-style: italic;
+}
+div.hosts {
+   overflow: auto;
+    width: 100%;
+    margin-top: 15px;
+}
+form.inspecthost select.portsel {
+    width:150px;
+    float: right;
+    clear: right;
+}
+form.inspecthost span.label {
+    vertical-align:top;
+    float: right;
+}
+form.inspecthost .portsel-open {
+    cursor: pointer;
+}
+ul.horiz {
+    list-style-type: none;
+    margin: 0px;
+    padding: 0px;
+}
+ul.horiz li {
+    display: inline-block;
+    padding: 0px;
+}
+div.hosts ul.horiz li {
+    width: 100px;
+    margin: 1px 5px;
+    overflow-x: hidden;
+}
+div.hosts button {
+    text-align: center;
+    border-radius: 5px;
+    white-space: nowrap;
+}
+div.inspectresult .ui-tabs-tab {
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+}
+div.pemcert {
+    width: fit-content;
+    padding-left:10px;
+    padding-right:10px;
+    background-color: lightgray;
+}
+div.capopup.ui-dialog-content {
+    overflow: unset;
+}
+div.capopup iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+div.caarecs>div {
+    margin-top:5px;
+}
+table.caarecords tr.caarec {
+    font-family: monospace;
+    font-size:small;
+}
+table.caarecords tr.caainfo {
+    font-size: small;
+}
+table.caarecords tr.caainfo td {
+    padding-top: 5px;
+}
+table.caarecords td.domain,
+table.caarecords td.contact,
+table.caarecords td.caid {
+    white-space:nowrap;
+}
+tr.pagenav li {
+    padding: 1px 5px;
+    width: 20px;
+    border-radius: 40px;
+    background-color: #795548;
+    color: white;
+    margin-left: 5px;
+    margin-right: 5px;
+    text-align: center;
+}
+tr.pagenav li.active {
+   color: #795548;
+   background-color: white;
+   border: 1px solid;
+}
+tr.pagenav td.pages,
+tr.pagenav li a {
+    text-align: center;
+}
+#namefilter.ui-autocomplete-loading {
+    background-color: yellow;
+}
+a.moreitems {
+    border: 2px solid;
+    border-radius: 50px;
+    background-color: #c4aba1;
+    text-decoration: none;
+}
+.ui-dialog,
+.ui-dialog-content {
+    box-sizing: content-box;
+}
+.ui-dialog,
+.ui-dialog .inspectresultstab {
+    background-color:#e6e0a8;
+}
+.ui-dialog {
+    border-radius:10px;width:500px;
+}
+.inspectresultstab .ui-tabs-panel {
+    height: 400px;
+    overflow: auto;
+}
+span.showcert.ui-icon {
+    cursor: pointer;
+}
+.ui-dialog-title {
+    text-align:center;
+}
+.ui-dialog-content.hostselect ul {
+    list-style:none;
+}
+
+button .ui-icon-trash {
+    background-image: url( icons );
+}
+
+button[name="acctnewkey"],
+button[name="renew"],
+button[name="acctimport"] {
+    background-color:  #c3c388;
+}
+button[name="acctdeactivate"],
+button[name="revoke"] {
+    background-color: #ff6666;
+    color: white;
+}

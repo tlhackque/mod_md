@@ -1,4 +1,5 @@
-/* Licensed to the Apache Software Foundation (ASF) under one or more
+/* Copyright (C) 2020 Timothe Litt
+ * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
@@ -14,13 +15,22 @@
  * limitations under the License.
  */
 
-#ifndef md_curl_h
-#define md_curl_h
+#ifndef MOD_MD_INSPECT_H
+#define  MOD_MD_INSPECT_H
 
-struct md_http_impl;
+#include "mod_md_manage.h"
 
-struct md_http_impl_t * md_curl_get_impl(apr_pool_t *p);
+typedef struct md_json_t md_json_t;
 
-void md_config_get_trusted( const char **certfile, const char **certpath );
+md_postfcn_t md_manage_inspect_host;
 
-#endif /* md_curl_h */
+int md_manage_inspect_host( md_json_t *resp, request_rec *r,
+                            const md_mod_conf_t *mc, const md_srv_conf_t *sc,
+                            md_json_t *pars );
+md_postfcn_t md_manage_caarecs;
+
+apr_status_t md_manage_caarecs( md_json_t *resp, request_rec *r,
+                                       const md_mod_conf_t *mc,
+                                       const md_srv_conf_t *sc,
+                                md_json_t *pars);
+#endif

@@ -3,6 +3,8 @@
 
 This repository contains `mod_md`, a module for Apache httpd that helps you to manage your domains.
 
+(Please see Changes.md for changes in the Charlotta branch of `mod_md`.)
+
 ## What is it good for?
 
 `mod_md` does two things:

@@ -24,4 +24,5 @@ int md_ocsp_status_hook(request_rec *r, int flags);
 
 int md_status_handler(request_rec *r);
 
+void print_time(apr_bucket_brigade *bb, const char *label, apr_time_t t);
 #endif /* mod_md_md_status_h */

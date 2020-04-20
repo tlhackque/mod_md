@@ -14,9 +14,15 @@
  * limitations under the License.
  */
  
+
+#ifndef MANAGE_GUI
+#define MANAGE_GUI 1
+#endif
+
 #include <assert.h>
 #include <apr_optional.h>
 #include <apr_hash.h>
+#include <apr_poll.h>
 #include <apr_strings.h>
 #include <apr_date.h>
 
@@ -51,6 +57,10 @@
 #include "mod_md_status.h"
 #include "mod_md_drive.h"
 
+#if MANAGE_GUI
+#include "mod_md_manage_server.h"
+#endif
+
 /**************************************************************************************************/
 /* watchdog based impl. */
 
@@ -65,7 +75,15 @@ struct md_renew_ctx_t {
     server_rec *s;
     md_mod_conf_t *mc;
     ap_watchdog_t *watchdog;
-    
+#if MANAGE_GUI
+#define MANAGE_BACKLOG SOMAXCONN
+    apr_sockaddr_t *m_sa;
+    apr_socket_t   *m_lsock;
+    apr_pollset_t  *m_pollset;
+    apr_pollfd_t    m_pollfd;
+    apr_time_t      m_sched_run;
+    unsigned char   m_link_key[MANAGE_KEY_LENGTH];
+#endif
     apr_array_header_t *jobs;
 };
 
@@ -181,7 +199,7 @@ static apr_status_t run_watchdog(int state, void *baton, apr_pool_t *ptemp)
     md_job_t *job;
     apr_time_t next_run, wait_time;
     int i;
-    
+
     /* mod_watchdog invoked us as a single thread inside the whole server (on this machine).
      * This might be a repeated run inside the same child (mod_watchdog keeps affinity as
      * long as the child lives) or another/new child.
@@ -190,12 +208,63 @@ static apr_status_t run_watchdog(int state, void *baton, apr_pool_t *ptemp)
         case AP_WATCHDOG_STATE_STARTING:
             ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, dctx->s, APLOGNO(10054)
                          "md watchdog start, auto drive %d mds", dctx->jobs->nelts);
+#if MANAGE_GUI
+            if( dctx->mc->manage_gui_enabled ) {
+                apr_status_t rv = APR_EGENERAL;
+
+                if( !( dctx->m_lsock &&
+                       APR_SUCCESS == (rv = apr_pollset_create(&dctx->m_pollset,
+                                                               1, dctx->p, 0)) ) ) {
+                    ap_log_error(APLOG_MARK, APLOG_CRIT, rv, dctx->s, APLOGNO()
+                                 "manage server initialization failed");
+                    return rv;
+                }
+                dctx->m_pollfd.p = dctx->p;
+                dctx->m_pollfd.desc_type = APR_POLL_SOCKET;
+                dctx->m_pollfd.reqevents = APR_POLLIN;
+                dctx->m_pollfd.rtnevents = 0;
+                dctx->m_pollfd.desc.s = dctx->m_lsock;
+                dctx->m_pollfd.client_data = (void *)dctx;
+                if( !( APR_SUCCESS == (rv = apr_pollset_add(dctx->m_pollset, &dctx->m_pollfd)) ) ) {
+                    ap_log_error(APLOG_MARK, APLOG_CRIT, rv, dctx->s, APLOGNO()
+                                 "manage server pollset initialization failed");
+                    return rv;
+                }
+                ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, dctx->s, APLOGNO()
+                             "manage server initialized on port %u", dctx->m_sa->port);
+            }
+#endif
             break;
             
         case AP_WATCHDOG_STATE_RUNNING:
+#if MANAGE_GUI
+            if( dctx->mc->manage_gui_enabled ) {
+                apr_status_t        rv;
+                apr_int32_t         nrdy, j;
+                const apr_pollfd_t *pfd;
+
+                while( APR_SUCCESS == (rv = apr_pollset_poll(dctx->m_pollset,
+                                                             0, &nrdy, &pfd)) ) {
+                    md_gui_server_ctx_t gctx;
+
+                    if( nrdy == 0 ) break;
+                    gctx.p    = ptemp;
+                    gctx.s    = dctx->s;
+                    gctx.mc   = dctx->mc;
+                    gctx.jobs = dctx->jobs;
+                    gctx.link_key = dctx->m_link_key;
+
+                    for( j = 0; j < nrdy; ++j ) {
+                        process_gui_server_request( &gctx, pfd[j].desc.s );
+                    }
+                }
+                if( apr_time_now() < dctx->m_sched_run )
+                    break;
+            }
+#endif
             ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, dctx->s, APLOGNO(10055)
                          "md watchdog run, auto drive %d mds", dctx->jobs->nelts);
-                         
+
             /* Process all drive jobs. They will update their next_run property
              * and we schedule ourself at the earliest of all. A job may specify 0
              * as next_run to indicate that it wants to participate in the normal
@@ -218,12 +287,24 @@ static apr_status_t run_watchdog(int state, void *baton, apr_pool_t *ptemp)
                 ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, dctx->s, APLOGNO(10107)
                              "next run in %s", md_duration_print(ptemp, wait_time));
             }
+#if MANAGE_GUI
+            if( dctx->mc->manage_gui_enabled ) {
+                dctx->m_sched_run = next_run;
+                if( wait_time > APR_USEC_PER_SEC * 2 )
+                    wait_time = APR_USEC_PER_SEC * 2;
+            }
+#endif
             wd_set_interval(dctx->watchdog, wait_time, dctx, run_watchdog);
             break;
             
         case AP_WATCHDOG_STATE_STOPPING:
             ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, dctx->s, APLOGNO(10058)
                          "md watchdog stopping");
+#if MANAGE_GUI
+            if( dctx->mc->manage_gui_enabled ) {
+                apr_pollset_destroy( dctx->m_pollset );
+            }
+#endif
             break;
     }
     
@@ -261,6 +342,7 @@ apr_status_t md_renew_start_watching(md_mod_conf_t *mc, server_rec *s, apr_pool_
      * 
      * 
      */
+
     wd_get_instance = APR_RETRIEVE_OPTIONAL_FN(ap_watchdog_get_instance);
     wd_register_callback = APR_RETRIEVE_OPTIONAL_FN(ap_watchdog_register_callback);
     wd_set_interval = APR_RETRIEVE_OPTIONAL_FN(ap_watchdog_set_callback_interval);
@@ -288,6 +370,48 @@ apr_status_t md_renew_start_watching(md_mod_conf_t *mc, server_rec *s, apr_pool_
     dctx->s = s;
     dctx->mc = mc;
     
+#if MANAGE_GUI
+    /* The watchdog thread also serves the management GUI.  This prevents conflicts.
+     * The management GUI requests may arrive at any child process; the watchdog thread
+     * listens on a private TCP socket for requests.  To avoid complicating the normal
+     * maintenance logic, it simply polls for connections fairly frequently; after
+     * servicing any connections, it only runs the normal logic at its scheduled time.
+     */
+    dctx->m_lsock = NULL;
+
+    if( dctx->mc->manage_gui_enabled ) {
+        /* Get port here in case privileged */
+        apr_port_t manage_port = (apr_port_t)(dctx->mc->manage_gui_enabled & (apr_port_t)-1);
+
+        if( !( APR_SUCCESS == (rv = apr_sockaddr_info_get(&dctx->m_sa, "127.0.0.1",
+                                                          APR_INET,
+                                                          manage_port,
+                                                          0, dctx->p)) &&
+               APR_SUCCESS == (rv = apr_socket_create(&dctx->m_lsock,
+                                                      dctx->m_sa->family, SOCK_STREAM,
+                                                      APR_PROTO_TCP, dctx->p)) &&
+               APR_SUCCESS == (rv = apr_socket_opt_set( dctx->m_lsock,
+                                                        APR_SO_NONBLOCK, 1)) &&
+               APR_SUCCESS == (rv = apr_socket_timeout_set( dctx->m_lsock, 0)) &&
+               APR_SUCCESS == (rv = apr_socket_opt_set( dctx->m_lsock,
+                                                        APR_SO_REUSEADDR, 1)) &&
+               APR_SUCCESS == (rv = apr_socket_bind( dctx->m_lsock, dctx->m_sa )) &&
+               APR_SUCCESS == (rv = apr_socket_listen( dctx->m_lsock,
+                                                       MANAGE_BACKLOG )) )) {
+            if( dctx->m_lsock ) apr_socket_close( dctx->m_lsock );
+            ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s, APLOGNO()
+                         "manage server failed to open socket for 127.0.0.1 port %u - %s",
+                         manage_port, APR_STATUS_IS_EACCES(rv)?
+                         "check SeLinux, capabilities, and other permission limitss" :
+                         "see mod_md and operating system documentation" );
+            return rv;
+        } else {
+            md_store_fs_get_manage_key(md_reg_store_get(mc->reg), dctx->m_link_key,
+                                       sizeof(dctx->m_link_key));
+        }
+    }
+#endif
+
     dctx->jobs = apr_array_make(dctx->p, mc->mds->nelts, sizeof(md_job_t *));
     for (i = 0; i < mc->mds->nelts; ++i) {
         md = APR_ARRAY_IDX(mc->mds, i, md_t*);
@@ -316,10 +440,19 @@ apr_status_t md_renew_start_watching(md_mod_conf_t *mc, server_rec *s, apr_pool_
     }
 
     if (!dctx->jobs->nelts) {
+#if MANAGE_GUI
+        if( dctx->mc->manage_gui_enabled ) {
+            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, APLOGNO()
+                         "no managed domain to drive, watchdog running management server.");
+        } else {
+#endif
         ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, APLOGNO(10065)
                      "no managed domain to drive, no watchdog needed.");
         apr_pool_destroy(dctx->p);
         return APR_SUCCESS;
+#if MANAGE_GUI
+        }
+#endif
     }
     
     if (APR_SUCCESS != (rv = wd_get_instance(&dctx->watchdog, MD_RENEW_WATCHDOG_NAME, 0, 1, dctx->p))) {

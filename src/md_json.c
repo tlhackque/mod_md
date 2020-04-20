@@ -307,8 +307,9 @@ int md_json_is(const md_json_type_t jtype, md_json_t *json, ...)
         case MD_JSON_TYPE_INT: return (j && json_is_integer(j));
         case MD_JSON_TYPE_BOOL: return (j && (json_is_true(j) || json_is_false(j)));
         case MD_JSON_TYPE_NULL: return (j == NULL);
+        default: break;
     }
-    return 0;
+    return MD_JSON_TYPE_UNKNOWN;
 }
 
 static const char *md_json_type_name(const md_json_t *json)

@@ -37,6 +37,91 @@
  */
 #define MOD_MD_VERSION_NUM @PACKAGE_VERSION_NUM@
 
+/**
+ * @macro
+ * Arguments used to configure build
+ */
+
+#define MD_CONFIGURE_ARGS "@MOD_MD_CONFIGURE_ARGS@"
+
 #define MD_ACME_DEF_URL    "@ACME_DEF_URL@"
+#define MD_ACME_DEF_CA_NAME "@ACME_DEF_CA_NAME@"
+
+/**
+ * @macro
+ * String specifying URL used by md-manage to obtain the jQuery library.
+ */
+#define MD_JQUERY_URL "@JQUERY_URL@"
+
+/**
+ * @macro
+ * String specifying URL used by md-manage to obtain the jQueryUI library.
+ */
+#define MD_JQUERYUI_URL "@JQUERYUI_URL@"
+
+/**
+ * @macro
+ * String specifying URL used by md-manage to obtain the jQueryUI CSS.
+ */
+#define MD_JQUERYUI_CSS_URL "@JQUERYUICSS_URL@"
+
+/**
+ * @macro
+ * String containing Curl's built-in CA bundle file path.
+ * Default for MDTrustedCAfile directive.
+ */
+/* There is no --with for this, but allow for cross-compilers
+ * to include in CPPFLAGS.
+ */
+#ifndef MD_TRUSTEDCAFILE
+#define MD_TRUSTEDCAFILE @MD_TRUSTEDCAFILE@
+#endif
+
+/**
+ * @macro
+ * String containing Curl's built-in CA bundle hashed
+ * directory path.
+ * Default for MDTrustedCApath directive.
+ */
+/* There is no --with for this, but allow for cross-compilers
+ * to include in CPPFLAGS.
+ */
+#ifndef MD_TRUSTEDCAPATH
+#define MD_TRUSTEDCAPATH @MD_TRUSTEDCAPATH@
+#endif
+
+/**
+ * @macro
+ * --enable flag for manageGUI use of system DNS resolvers .
+ * Default: no (here, 0)
+ */
+#define USE_SYSTEM_DNS_SERVERS @USE_SYSTEM_DNS_SERVERS@
+
+/**
+ * @macro
+ * --with-resolv-conf=file Where manageGUI looks for nameservers on Unix
+ * Default: /etc/resolv.conf)
+ */
+#define DNSQ_RESOLV_CONF "@DNSQ_RESOLV_CONF@"
+
+/**
+ * @macro
+ * --with-public-dns=list manageGUI nameservers of last resort
+ * a comma-separated list of strings.
+ * Default: some public servers, including "8.8.8.8" and "[2620:fe::fe]"
+ */
+
+#define DNSQ_PUBLIC_NAMESERVERS "@DNSQ_PUBLIC_NAMESERVERS@"
+
+/**
+ * @macro
+ * --with-debug-js=url
+ * local URL to which requests for GUI JS are redirected.
+ * Allows debugging the GUI js without recompiling the interal copy.
+ * Not supported for production.
+ * Default: use the internal JS.
+ */
+@MANAGE_DEBUG_DATA@
+@MANAGE_DEBUG_JS@
 
 #endif /* mod_md_md_version_h */

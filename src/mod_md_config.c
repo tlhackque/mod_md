@@ -27,10 +27,12 @@
 
 #include "md.h"
 #include "md_crypt.h"
+#include "md_curl.h"
 #include "md_log.h"
 #include "md_util.h"
 #include "mod_md_private.h"
 #include "mod_md_config.h"
+#include "md_version.h"
 
 #define MD_CMD_MD_SECTION     "<MDomainSet"
 #define MD_CMD_MD2_SECTION    "<MDomain"
@@ -77,10 +79,16 @@ static md_mod_conf_t defmc = {
     0,                         /* dry_run flag */
     1,                         /* server_status_enabled */
     1,                         /* certificate_status_enabled */
+    0,                         /* manage_gui_enabled */
+    NULL,                      /* manage_gui_stylesheet */
+    NULL,                      /* URL of (optional) logo */
+    MD_TRUSTEDCAFILE,          /* trusted (root) CA bundle */
+    MD_TRUSTEDCAPATH,          /* trusted (root) CA directory */
     &def_ocsp_keep_window,     /* default time to keep ocsp responses */
     &def_ocsp_renew_window,    /* default time to renew ocsp responses */
     "crt.sh",                  /* default cert checker site name */
     "https://crt.sh?q=",       /* default cert checker site url */
+    NULL,                      /* CA names */
 };
 
 static md_timeslice_t def_renew_window = {
@@ -90,6 +98,21 @@ static md_timeslice_t def_renew_window = {
 static md_timeslice_t def_warn_window = {
     MD_TIME_LIFE_NORM,
     MD_TIME_WARN_WINDOW_DEF,
+};
+
+/* Initializer for CA names table.
+ * If the default (from configure) is one of these, the name from
+ * configure will supersede because it's last in this table.
+ */
+static struct {
+    const char *const url;
+    const char *const name;
+} knownCAs[] = {
+    { LE_ACMEv1_STAGING, "Let's Encrypt (v1,staging)" },
+    { LE_ACMEv1_PROD,    "Let's Encrypt (v1)" },
+    { LE_ACMEv2_STAGING, "Let's Encrypt (staging)" },
+    { LE_ACMEv2_PROD,    "Let's Encrypt" },
+    { MD_ACME_DEF_URL,   MD_ACME_DEF_CA_NAME }
 };
 
 /* Default server specific setting */
@@ -132,13 +155,17 @@ static md_mod_conf_t *md_mod_conf_get(apr_pool_t *pool, int create)
     }
 
     if (create) {
+        size_t i;
         mod_md_config = apr_pcalloc(pool, sizeof(*mod_md_config));
         memcpy(mod_md_config, &defmc, sizeof(*mod_md_config));
         mod_md_config->mds = apr_array_make(pool, 5, sizeof(const md_t *));
         mod_md_config->unused_names = apr_array_make(pool, 5, sizeof(const md_t *));
         mod_md_config->env = apr_table_make(pool, 10);
         mod_md_config->init_errors = apr_hash_make(pool);
-         
+        mod_md_config->ca_names = apr_table_make(pool,3);
+        for( i = 0; i < sizeof(knownCAs)/sizeof(knownCAs[0]); ++i ) {
+            apr_table_set(mod_md_config->ca_names, knownCAs[i].url, knownCAs[i].name );
+        }
         apr_pool_cleanup_register(pool, NULL, cleanup_mod_config, apr_pool_cleanup_null);
     }
     
@@ -457,7 +484,7 @@ static const char *md_config_set_names(cmd_parms *cmd, void *dc,
     return NULL;
 }
 
-static const char *md_config_set_ca(cmd_parms *cmd, void *dc, const char *value)
+static const char *md_config_set_ca(cmd_parms *cmd, void *dc, const char *v1, const char *v2)
 {
     md_srv_conf_t *sc = md_config_get(cmd->server);
     const char *err;
@@ -466,7 +493,18 @@ static const char *md_config_set_ca(cmd_parms *cmd, void *dc, const char *value)
     if ((err = md_conf_check_location(cmd, MD_LOC_ALL))) {
         return err;
     }
-    sc->ca_url = value;
+    sc->ca_url = v1;
+    if( v2 ) {
+        apr_table_set(sc->mc->ca_names, v1, v2);
+    } else if( !apr_table_get( sc->mc->ca_names, v1 ) ) {
+        apr_uri_t uri_parsed;
+
+        if(APR_SUCCESS == apr_uri_parse(cmd->temp_pool, v1, &uri_parsed)) {
+            apr_table_set(sc->mc->ca_names, v1, uri_parsed.hostname );
+        } else {
+            apr_table_set(sc->mc->ca_names, v1, v1 );
+        }
+    }
     return NULL;
 }
 
@@ -735,7 +773,7 @@ static const char *md_config_set_port_map(cmd_parms *cmd, void *arg,
     return err;
 }
 
-static const char *md_config_set_cha_tyes(cmd_parms *cmd, void *dc, 
+static const char *md_config_set_cha_types(cmd_parms *cmd, void *dc, 
                                           int argc, char *const argv[])
 {
     md_srv_conf_t *config = md_config_get(cmd->server);
@@ -906,6 +944,85 @@ static const char *md_config_set_certificate_status(cmd_parms *cmd, void *dc, co
     return set_on_off(&sc->mc->certificate_status_enabled, value, cmd->pool);
 }
 
+static const char *md_config_set_manage_gui(cmd_parms *cmd, void *dc, const char *v1, const char *v2)
+{
+    md_srv_conf_t *sc = md_config_get(cmd->server);
+    const char *err;
+
+    (void)dc;
+    if ((err = md_conf_check_location(cmd, MD_LOC_ALL))) {
+        return err;
+    }
+    if( (err = set_on_off(&sc->mc->manage_gui_enabled, v1, cmd->pool)) ) {
+        return err;
+    }
+    if( v2 && !sc->mc->manage_gui_enabled )
+        return apr_psprintf( cmd->pool, "MDManageGUI: Invalid argument \"%s\"", v2 );
+    if( v2 ) {
+        int port;
+        char *ep;
+        port = (int)strtol( v2, &ep, 10 );
+        if( port > (apr_port_t)-1 || !*v2 || *ep ) {
+            return apr_psprintf( cmd->pool, "MDManageGUI: Invalid argument \"%s\"", v2 );
+        }
+        sc->mc->manage_gui_enabled = (1 + (apr_port_t)-1) | port;
+    } else {
+        sc->mc->manage_gui_enabled = (1 + (apr_port_t)-1) | 280;
+    }
+    return NULL;
+}
+
+static const char *md_config_set_manage_gui_stylesheet(cmd_parms *cmd, void *dc, const char *value)
+{
+    md_srv_conf_t *sc = md_config_get(cmd->server);
+    const char *err;
+
+    (void)dc;
+    if ((err = md_conf_check_location(cmd, MD_LOC_ALL))) {
+        return err;
+    }
+    sc->mc->manage_gui_stylesheet = value;
+    return NULL;
+}
+
+static const char *md_config_set_manage_gui_logo(cmd_parms *cmd, void *dc, const char *value)
+{
+    md_srv_conf_t *sc = md_config_get(cmd->server);
+    const char *err;
+
+    (void)dc;
+    if ((err = md_conf_check_location(cmd, MD_LOC_ALL))) {
+        return err;
+    }
+    sc->mc->manage_gui_logo = value;
+    return NULL;
+}
+
+static const char *md_config_set_trustedcertsfile(cmd_parms *cmd, void *dc, const char *value)
+{
+    md_srv_conf_t *sc = md_config_get(cmd->server);
+    const char *err;
+
+    (void)dc;
+    if ((err = md_conf_check_location(cmd, MD_LOC_ALL))) {
+        return err;
+    }
+    sc->mc->trustedcertsfile = value;
+    return NULL;
+}
+static const char *md_config_set_trustedcertspath(cmd_parms *cmd, void *dc, const char *value)
+{
+    md_srv_conf_t *sc = md_config_get(cmd->server);
+    const char *err;
+
+    (void)dc;
+    if ((err = md_conf_check_location(cmd, MD_LOC_ALL))) {
+        return err;
+    }
+    sc->mc->trustedcertspath = value;
+    return NULL;
+}
+
 static const char *md_config_set_ocsp_keep_window(cmd_parms *cmd, void *dc, const char *value)
 {
     md_srv_conf_t *sc = md_config_get(cmd->server);
@@ -971,11 +1088,11 @@ static const char *md_config_set_activation_delay(cmd_parms *cmd, void *mconfig,
 }
 
 const command_rec md_cmds[] = {
-    AP_INIT_TAKE1("MDCertificateAuthority", md_config_set_ca, NULL, RSRC_CONF, 
-                  "URL of CA issuing the certificates"),
+    AP_INIT_TAKE12("MDCertificateAuthority", md_config_set_ca, NULL, RSRC_CONF,
+                   "URL of CA issuing the certificates [display name]"),
     AP_INIT_TAKE1("MDCertificateAgreement", md_config_set_agreement, NULL, RSRC_CONF, 
                   "either 'accepted' or the URL of CA Terms-of-Service agreement you accept"),
-    AP_INIT_TAKE_ARGV("MDCAChallenges", md_config_set_cha_tyes, NULL, RSRC_CONF, 
+    AP_INIT_TAKE_ARGV("MDCAChallenges", md_config_set_cha_types, NULL, RSRC_CONF,
                       "A list of challenge types to be used."),
     AP_INIT_TAKE1("MDCertificateProtocol", md_config_set_ca_proto, NULL, RSRC_CONF, 
                   "Protocol used to obtain/renew certificates"),
@@ -1028,6 +1145,16 @@ const command_rec md_cmds[] = {
                   "On to see Managed Domains in server-status."),
     AP_INIT_TAKE1("MDCertificateStatus", md_config_set_certificate_status, NULL, RSRC_CONF, 
                   "On to see Managed Domain expose /.httpd/certificate-status."),
+    AP_INIT_TAKE1("MDTrustedCAfile", md_config_set_trustedcertsfile, NULL, RSRC_CONF,
+                  "Certificates trusted to verify remote hosts"),
+    AP_INIT_TAKE1("MDTrustedCApath", md_config_set_trustedcertspath, NULL, RSRC_CONF,
+                  "Hashed directory of certificates trusted to verify remote hosts"),
+    AP_INIT_TAKE12("MDManageGUI", md_config_set_manage_gui, NULL, RSRC_CONF,
+                   "On to enable md-mange handler."),
+    AP_INIT_TAKE1("MDManageGUIStylesheet", md_config_set_manage_gui_stylesheet, NULL, RSRC_CONF,
+                  "Custom stylesheet for md GUI"),
+    AP_INIT_TAKE1("MDManageGUILogo", md_config_set_manage_gui_logo, NULL, RSRC_CONF,
+                  "Custom logo for md GUI"),
     AP_INIT_TAKE1("MDWarnWindow", md_config_set_warn_window, NULL, RSRC_CONF, 
                   "When less time remains for a certificate, send our/log a warning (defaults to days)"),
     AP_INIT_RAW_ARGS("MDMessageCmd", md_config_set_msg_cmd, NULL, RSRC_CONF, 
@@ -1100,6 +1227,15 @@ md_srv_conf_t *md_config_cget(conn_rec *c)
     return md_config_get(c->base_server);
 }
 
+/* Called by md_curl to get trusted CA items.  A different version is in
+ * md_cmd_main for its use.  The function signatures must match.
+ */
+void md_config_get_trusted( const char **certfile, const char **certpath )
+{
+    if( *certfile ) *certfile = md_config_gets( NULL,  MD_CONFIG_TRUSTED_CERT_FILE );
+    if( *certpath ) *certpath = md_config_gets( NULL,  MD_CONFIG_TRUSTED_CERT_PATH );
+}
+
 const char *md_config_gets(const md_srv_conf_t *sc, md_config_var_t var)
 {
     switch (var) {
@@ -1117,6 +1253,10 @@ const char *md_config_gets(const md_srv_conf_t *sc, md_config_var_t var)
             return sc->ca_agreement? sc->ca_agreement : defconf.ca_agreement;
         case MD_CONFIG_NOTIFY_CMD:
             return sc->mc->notify_cmd;
+        case MD_CONFIG_TRUSTED_CERT_FILE:
+            return mod_md_config->trustedcertsfile;
+        case MD_CONFIG_TRUSTED_CERT_PATH:
+            return mod_md_config->trustedcertspath;
         default:
             return NULL;
     }

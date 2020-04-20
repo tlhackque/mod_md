@@ -49,6 +49,7 @@
 #include "mod_md_config.h"
 #include "mod_md_drive.h"
 #include "mod_md_status.h"
+#include "md_git_version.h"
 
 /**************************************************************************************************/
 /* Certificate status */
@@ -79,10 +80,11 @@ int md_http_cert_status(request_rec *r)
     md = md_get_by_domain(sc->mc->mds, r->hostname);
     if (!md) return DECLINED;
 
+    ap_allow_standard_methods(r, 1, M_GET);
     if (r->method_number != M_GET) {
         ap_log_rerror(APLOG_MARK, APLOG_TRACE2, 0, r,
                       "md(%s): status supports only GET", md->name);
-        return HTTP_NOT_IMPLEMENTED;
+        return HTTP_METHOD_NOT_ALLOWED;
     }
     
     ap_log_rerror(APLOG_MARK, APLOG_TRACE2, 0, r,
@@ -135,7 +137,7 @@ int md_http_cert_status(request_rec *r)
      }
     
     ap_log_rerror(APLOG_MARK, APLOG_TRACE2, 0, r, "md[%s]: sending status", md->name);
-    apr_table_set(r->headers_out, "Content-Type", "application/json"); 
+    ap_set_content_type( r, "application/json");
     bb = apr_brigade_create(r->pool, r->connection->bucket_alloc);
     md_json_writeb(resp, MD_JSON_FMT_INDENT, bb);
     ap_pass_brigade(r->output_filters, bb);
@@ -188,27 +190,13 @@ static void si_val_status(status_ctx *ctx, md_json_t *mdj, const status_info *in
 static void si_val_url(status_ctx *ctx, md_json_t *mdj, const status_info *info)
 {
     const char *url, *s;
-    apr_uri_t uri_parsed;
 
-    
-    s = url = md_json_gets(mdj, info->key, NULL);
+    url = md_json_gets(mdj, info->key, NULL);
     if (!url) return;
-    if (!strcmp(LE_ACMEv2_PROD, url)) {
-        s = "Let's Encrypt";
-    }
-    else if (!strcmp(LE_ACMEv2_STAGING, url)) {
-        s = "Let's Encrypt (staging)";
-    }
-    else if (!strcmp(LE_ACMEv1_PROD, url)) {
-        s = "Let's Encrypt (v1)";
-    }
-    else if (!strcmp(LE_ACMEv1_STAGING, url)) {
-        s = "Let's Encrypt (v1,staging)";
-    }
-    else if (APR_SUCCESS == apr_uri_parse(ctx->p, url, &uri_parsed)) {
-        s = uri_parsed.hostname;
-        
-    }
+
+    s = apr_table_get( ctx->mc->ca_names, url );
+    if( !s ) return; /* Should never fail */
+
     apr_brigade_printf(ctx->bb, NULL, NULL, "<a href='%s'>%s</a>", 
                        ap_escape_html2(ctx->p, url, 1), 
                        ap_escape_html2(ctx->p, s, 1));
@@ -236,7 +224,7 @@ static void print_date(apr_bucket_brigade *bb, apr_time_t timestamp, const char 
     }
 }
 
-static void print_time(apr_bucket_brigade *bb, const char *label, apr_time_t t)
+void print_time(apr_bucket_brigade *bb, const char *label, apr_time_t t)
 {
     apr_time_t now;
     const char *pre, *post, *sep;
@@ -678,9 +666,10 @@ int md_status_handler(request_rec *r)
     mc = sc->mc;
     if (!mc) return DECLINED;
 
+    ap_allow_standard_methods(r, 1, M_GET);
     if (r->method_number != M_GET) {
         ap_log_rerror(APLOG_MARK, APLOG_TRACE2, 0, r, "md-status supports only GET");
-        return HTTP_NOT_IMPLEMENTED;
+        return HTTP_METHOD_NOT_ALLOWED;
     }
     
     jstatus = NULL;
@@ -701,7 +690,7 @@ int md_status_handler(request_rec *r)
     }
 
     if (jstatus) {
-        apr_table_set(r->headers_out, "Content-Type", "application/json"); 
+        ap_set_content_type( r, "application/json");
         bb = apr_brigade_create(r->pool, r->connection->bucket_alloc);
         md_json_writeb(jstatus, MD_JSON_FMT_INDENT, bb);
         ap_pass_brigade(r->output_filters, bb);
@@ -711,4 +700,3 @@ int md_status_handler(request_rec *r)
     }
     return DECLINED;
 }
-

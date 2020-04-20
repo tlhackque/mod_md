@@ -40,6 +40,8 @@ typedef enum {
     MD_CONFIG_MESSGE_CMD,
     MD_CONFIG_STAPLING,
     MD_CONFIG_STAPLE_OTHERS,
+    MD_CONFIG_TRUSTED_CERT_FILE,
+    MD_CONFIG_TRUSTED_CERT_PATH,
 } md_config_var_t;
 
 typedef struct md_mod_conf_t md_mod_conf_t;
@@ -66,10 +68,16 @@ struct md_mod_conf_t {
     int dry_run;                       /* != 0 iff config dry run */
     int server_status_enabled;         /* if module should add to server-status handler */
     int certificate_status_enabled;    /* if module should expose /.httpd/certificate-status */
+    int manage_gui_enabled;            /* if module should enable md-manage handler: queuing port */
+    const char *manage_gui_stylesheet; /* URL of custom stylesheet for md-manage handler */
+    const char *manage_gui_logo;       /* URL of (optional) logo */
+    const char *trustedcertsfile;      /* File containing trusted CA certificates for host verification */
+    const char *trustedcertspath;      /* Hash directory containing trusted CA certificates for host verification */
     md_timeslice_t *ocsp_keep_window;  /* time that we keep ocsp responses around */
     md_timeslice_t *ocsp_renew_window; /* time before exp. that we start renewing ocsp resp. */
     const char *cert_check_name;       /* name of the linked certificate check site */
     const char *cert_check_url;        /* url "template for" checking a certificate */
+    struct apr_table_t *ca_names;      /* Map of CA URLs to "friendly" names for humans */
 };
 
 typedef struct md_srv_conf_t {
@@ -84,7 +92,6 @@ typedef struct md_srv_conf_t {
     struct md_pkeys_spec_t *pks;       /* specification for private keys */
     md_timeslice_t *renew_window;      /* time before expiration that starts renewal */
     md_timeslice_t *warn_window;       /* time before expiration that warning are sent out */
-    
     const char *ca_url;                /* url of CA certificate service */
     const char *ca_contact;            /* contact email registered to account */
     const char *ca_proto;              /* protocol used vs CA (e.g. ACME) */
@@ -99,6 +106,7 @@ typedef struct md_srv_conf_t {
     int is_ssl;                        /* SSLEngine is enabled here */
 } md_srv_conf_t;
 
+void md_config_get_trusted( const char **certfile, const char **certpath );
 void *md_config_create_svr(apr_pool_t *pool, server_rec *s);
 void *md_config_merge_svr(apr_pool_t *pool, void *basev, void *addv);
 

@@ -244,7 +244,8 @@ static apr_status_t internals_setup(md_http_request_t *req)
     md_curl_internals_t *internals;
     CURL *curl;
     apr_status_t rv = APR_SUCCESS;
-    
+    const char *cafile, *capath;
+
     curl = curl_easy_init();
     if (!curl) {
         rv = APR_EGENERAL;
@@ -252,7 +253,11 @@ static apr_status_t internals_setup(md_http_request_t *req)
     }
     internals = apr_pcalloc(req->pool, sizeof(*internals));
     internals->curl = curl;
-        
+
+    md_config_get_trusted( &cafile, &capath );
+    if (cafile) curl_easy_setopt(curl, CURLOPT_CAINFO, cafile);
+    if (capath) curl_easy_setopt(curl, CURLOPT_CAPATH, capath);
+
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_cb);
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, NULL);
     curl_easy_setopt(curl, CURLOPT_READFUNCTION, req_data_cb);

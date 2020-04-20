@@ -18,6 +18,7 @@
 #define mod_md_md_crypt_h
 
 #include <apr_file_io.h>
+#include <openssl/asn1.h>
 
 struct apr_array_header_t;
 struct md_t;
@@ -171,6 +172,7 @@ int md_cert_must_staple(const md_cert_t *cert);
 apr_time_t md_cert_get_not_after(const md_cert_t *cert);
 apr_time_t md_cert_get_not_before(const md_cert_t *cert);
 struct md_timeperiod_t md_cert_get_valid(const md_cert_t *cert);
+apr_time_t md_asn1_time_get(const ASN1_TIME* time);
 
 apr_status_t md_cert_get_issuers_uri(const char **puri, const md_cert_t *cert, apr_pool_t *p);
 apr_status_t md_cert_get_alt_names(apr_array_header_t **pnames, const md_cert_t *cert, apr_pool_t *p);

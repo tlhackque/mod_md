@@ -89,12 +89,21 @@ mod_md_la_LDFLAGS  = -module -L../src -lmd -ljansson -lcurl -lssl -lcrypto -expo
 BUILT_SOURCES = \
     md_git_version.h
 
+DISTCLEANFILES = \
+    mod_md_manage_data.c
+
 OBJECTS = \
     mod_md_config.c \
     mod_md_drive.c \
     mod_md_ocsp.c \
     mod_md_os.c \
     mod_md_status.c \
+    mod_md_manage.c \
+    mod_md_manage_server.c \
+    mod_md_dnsquery.c \
+    mod_md_inspect.c \
+    mod_md_manage_data.c \
+    starttls.c \
     mod_md.c
 
 HFILES = \
@@ -103,8 +112,17 @@ HFILES = \
     mod_md_ocsp.h \
     mod_md_os.h \
     mod_md_status.h \
+    mod_md_manage.h \
+    mod_md_manage_server.h \
+    mod_md_dnsquery.h \
+    mod_md_inspect.h \
+    starttls.h \
+    mod_md_manage_data.h \
     mod_md_private.h \
     mod_md.h
+
+mod_md_manage_data.c: mod_md_manage_data.c.in md.h md_version.h mod_md_config.h mod_md_manage_data.h ACME-Logo2.png ui-icons_ffffff_256x240.png mod_md_manage.css mod_md_manage.js make_manage_data.sh
+	@./make_manage_data.sh
 
 md_git_version.h:
 	@./make_gitversion.sh

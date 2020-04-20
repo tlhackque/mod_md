@@ -29,6 +29,7 @@ struct md_timeperiod_t;
 typedef struct md_json_t md_json_t;
 
 typedef enum {
+    MD_JSON_TYPE_UNKNOWN,
     MD_JSON_TYPE_OBJECT,
     MD_JSON_TYPE_ARRAY,
     MD_JSON_TYPE_STRING,

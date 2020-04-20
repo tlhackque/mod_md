@@ -1,4 +1,5 @@
-/* Licensed to the Apache Software Foundation (ASF) under one or more
+/* Copyright (C) 2020 Timothe Litt
+ * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
@@ -14,13 +15,21 @@
  * limitations under the License.
  */
 
-#ifndef md_curl_h
-#define md_curl_h
+#ifndef MOD_MD_DNSQUERY_H
+#define MOD_MD_DNSQUERY_H
 
-struct md_http_impl;
+#include <apr.h>
+#include <apr_tables.h>
 
-struct md_http_impl_t * md_curl_get_impl(apr_pool_t *p);
+#define DNSQUERY_USE_HTML 0x1000
+#define DNSQUERY_MASK_TTL 0x2000
+typedef enum {
+    DNSQUERY_CAA = 0,
+    DNSQUERY_TXT,
+    DNSQUERY_CAA_HTML = DNSQUERY_USE_HTML,
+    DNSQUERY_TXT_HTML,
+} md_dnsquery_rr_t;
 
-void md_config_get_trusted( const char **certfile, const char **certpath );
-
-#endif /* md_curl_h */
+apr_status_t dnsq_find_rrset( apr_pool_t *p, apr_array_header_t *recs,
+                         const char *dom, md_dnsquery_rr_t rrtype );
+#endif

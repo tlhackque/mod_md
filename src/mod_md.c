@@ -53,7 +53,10 @@
 #include "mod_md_ocsp.h"
 #include "mod_md_os.h"
 #include "mod_md_status.h"
+#include "mod_md_manage.h"
 #include "mod_ssl_openssl.h"
+
+#define MANAGE_GUI 1
 
 static void md_hooks(apr_pool_t *pool);
 
@@ -863,7 +866,8 @@ static apr_status_t md_post_config_before_ssl(apr_pool_t *p, apr_pool_t *plog,
     }
     else {
         ap_log_error( APLOG_MARK, APLOG_INFO, 0, s, APLOGNO(10071)
-                     "mod_md (v%s), initializing...", MOD_MD_VERSION);
+                     "mod_md (v%s), initializing...\nConfigured with: %s",
+                      MOD_MD_VERSION, MD_CONFIGURE_ARGS);
     }
 
     (void)plog;
@@ -978,6 +982,13 @@ static apr_status_t md_post_config_after_ssl(apr_pool_t *p, apr_pool_t *plog,
      * and only staging/challenges may be manipulated */
     md_reg_freeze_domains(mc->reg, mc->mds);
 
+    /* Manage GUI runs watchdog even if no domains to watch */
+#if MANAGE_GUI
+    (void)watched;
+
+    md_http_use_implementation(md_curl_get_impl(p));
+    rv = md_renew_start_watching(mc, s, p);
+#else
     if (watched) {
         /*10*/
         ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s, APLOGNO(10074)
@@ -989,6 +1000,7 @@ static apr_status_t md_post_config_after_ssl(apr_pool_t *p, apr_pool_t *plog,
     else {
         ap_log_error( APLOG_MARK, APLOG_DEBUG, 0, s, APLOGNO(10075) "no mds to supervise");
     }
+#endif
 
     if (!mc->ocsp || md_ocsp_count(mc->ocsp) == 0) goto leave;
 
@@ -1519,7 +1531,7 @@ static void md_hooks(apr_pool_t *pool)
     APR_OPTIONAL_HOOK(ap, status_hook, md_domains_status_hook, NULL, NULL, APR_HOOK_MIDDLE);
     APR_OPTIONAL_HOOK(ap, status_hook, md_ocsp_status_hook, NULL, NULL, APR_HOOK_MIDDLE);
     ap_hook_handler(md_status_handler, NULL, NULL, APR_HOOK_MIDDLE);
-
+    ap_hook_handler(md_manage_handler, NULL, NULL, APR_HOOK_MIDDLE);
 
 #ifndef SSL_CERT_HOOKS
 #error "This version of mod_md requires Apache httpd 2.4.41 or newer."

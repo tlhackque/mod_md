@@ -31,6 +31,7 @@
 #include "md_json.h"
 #include "md_log.h"
 #include "md_store.h"
+#define MANAGE_GUI 1
 #include "md_store_fs.h"
 #include "md_util.h"
 #include "md_version.h"
@@ -247,6 +248,29 @@ static apr_status_t read_store_file(md_store_fs_t *s_fs, const char *fname,
     }
     return rv;
 }
+
+#if MANAGE_GUI
+#include <openssl/evp.h>
+
+void md_store_fs_get_manage_key(md_store_t *store, unsigned char *buffer, const size_t len) {
+    EVP_MD_CTX *mdctx;
+    unsigned int rlen, i;
+    unsigned char rbuf[EVP_MAX_MD_SIZE];
+
+    md_store_fs_t *s_fs = FS_STORE(store);
+
+    mdctx = EVP_MD_CTX_create();
+    EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL);
+    EVP_DigestUpdate(mdctx, (const void *)s_fs->key.data, (size_t)s_fs->key.len);
+    EVP_DigestFinal_ex(mdctx, rbuf, &rlen);
+    EVP_MD_CTX_destroy(mdctx);
+
+    for( i = 0; i < len; ++i ) {
+        buffer[i] = rbuf[ i % rlen ];
+    }
+    return;
+}
+#endif
 
 static apr_status_t setup_store_file(void *baton, apr_pool_t *p, apr_pool_t *ptemp, va_list ap)
 {

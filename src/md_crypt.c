@@ -205,7 +205,7 @@ static int pem_passwd(char *buf, int size, int rwflag, void *baton)
  * not caughts up yet or chose to ignore. An alternative is implemented, we prefer 
  * however the *SSL to maintain such things.
  */
-static apr_time_t md_asn1_time_get(const ASN1_TIME* time)
+apr_time_t md_asn1_time_get(const ASN1_TIME* time)
 {
 #if OPENSSL_VERSION_NUMBER < 0x10002000L || defined(LIBRESSL_VERSION_NUMBER)
     /* courtesy: https://stackoverflow.com/questions/10975542/asn1-time-to-time-t-conversion#11263731
@@ -1246,7 +1246,7 @@ apr_status_t md_cert_fload(md_cert_t **pcert, apr_pool_t *p, const char *fname)
 {
     FILE *f;
     apr_status_t rv;
-    md_cert_t *cert;
+    md_cert_t *cert = NULL;
     X509 *x509;
     
     rv = md_util_fopen(&f, fname, "r");

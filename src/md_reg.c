@@ -528,7 +528,7 @@ static apr_status_t pubcert_load(void *baton, apr_pool_t *p, apr_pool_t *ptemp, 
 {
     md_reg_t *reg = baton;
     apr_array_header_t *certs;
-    md_pubcert_t *pubcert, **ppubcert;
+    md_pubcert_t *pubcert = NULL, **ppubcert;
     const md_t *md;
     md_pkey_spec_t *spec;
     const md_cert_t *cert;
