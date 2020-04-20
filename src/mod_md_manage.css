@@ -312,3 +312,6 @@ button[name="revoke"] {
     background-color: #ff6666;
     color: white;
 }
+span.noneselected {
+    font-style:italic;
+}

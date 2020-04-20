@@ -272,16 +272,20 @@ $( function() {
        },
        checkedChange = function() {
            var n = $("input[type='checkbox'][name=\"select\"]:checked").length;
-           $("button[name=\"renew\"],button[name=\"revoke\"]")
-           .each(function(idx) {
-                     if( n ) {
-                         $(this).removeClass("hidden");
-                     } else {
-                         $(this).addClass("hidden");
-                     }
-                     return true;
-                 });
-           return true;
+           if( $("button[name=\"renew\"],button[name=\"revoke\"]")
+               .each(function(idx) {
+                         if( n ) {
+                             $(this).removeClass("hidden");
+                         } else {
+                             $(this).addClass("hidden");
+                         }
+                         return true;
+                     }).hasClass("hidden") ) {
+               $("span.noneselected").removeClass("hidden");
+           } else {
+               $("span.noneselected").addClass("hidden");
+           }
+               return true;
        },
        updateDomains = function(tbody,data) {
           $("input[type='checkbox'][name=\"select\"]").checkboxradio("destroy");
