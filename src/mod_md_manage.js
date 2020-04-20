@@ -36,6 +36,15 @@ jQuery(function($) {
                   });
            return o;
        };
+       Math.trunc = Math.trunc || function(x) { /* IE */
+           if( isNaN( x ) ) {
+               return NaN;
+           }
+           if( x > 0 ) {
+               return Math.floor( x );
+           }
+           return Math.ceil( x );
+       };
        var
        ajaxTimeout = 75*1000,
        meta = {},
@@ -68,18 +77,17 @@ jQuery(function($) {
            return true;
        },
        makebuttons = function(list) {
-           var b;
-           for( b of list ) {
-               var sel = b.name.map(function(v,i,a){ return "button[name=\"" + v + "\"]";})
-               .join(",");
-               $(sel)
-               .button({
-                       icon: b.icon
-                           })
-               .on( "click", function(event) {
-                        return postCommand(this);
-                    });
-           }
+           list.forEach(function( b, idx ) {
+                var sel = b.name.map(function(v,i,a){ return "button[name=\"" + v + "\"]";})
+                    .join(",");
+                $(sel)
+                    .button({
+                            icon: b.icon
+                                })
+                    .on( "click", function(event) {
+                             return postCommand(this);
+                         });
+                        });
        },
        postCommand = function(btn) {
            var form = $(btn).closest("form");
