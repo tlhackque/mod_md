@@ -65,7 +65,8 @@ div.pageheader h1 {
 div.pageheader img.logo {
     float:left;
     margin: 0px 0px 15px 0px;
-    opacity: 50%;
+    opacity: 0.5;
+    filter: alpha(opacity=50);
 }
 div.messages {
     clear:left;
