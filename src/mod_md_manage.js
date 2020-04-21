@@ -47,18 +47,18 @@ jQuery(function($) {
        };
        var
        ajaxTimeout = 75*1000,
-       meta = {},
+       meta  = {},
        kmeta = { termsOfService: "Terms of Service",
-                 website: "Website",
-                 caaIdentities: "Identities used in DNS CAA records",
-                 externalAccountRequired:"New account requests must be associated with an external account"
+                        website: "Website",
+                  caaIdentities: "Identities used in DNS CAA records",
+        externalAccountRequired: "New account requests must be associated with an external account"
        },
        dposition = { my: "top", at: "top+25", of: window },
-       accounts = {},
-       can = 0,
-       domain = null,
-       filter = null,
-       xstatus = function( xhr, status, what ) {
+       accounts  = {},
+       can       = 0,
+       domain    = null,
+       filter    = null,
+       xstatus   = function( xhr, status, what ) {
            if( status == "error" ) {
                status = xhr.status.toString() + " " + xhr.statusText;
            }
@@ -90,18 +90,18 @@ jQuery(function($) {
                         });
        },
        postCommand = function(btn) {
-           var form = $(btn).closest("form");
+           var form     = $(btn).closest("form");
            $(form).find("input[name=\"function\"]").val(btn.name);
-           var first = $("table.actions tr.pagenav li.active a").attr("value");
+           var first    = $("table.actions tr.pagenav li.active a").attr("value");
            var pagesize = parseInt( $("select[name=\"pagelimit\"]").val() );
-           first = (Math.trunc((first -1) / pagesize) * pagesize) +1;
+           first        = (Math.trunc((first -1) / pagesize) * pagesize) +1;
            var pg = {
                start: parseInt(first),
-               count: pagesize};
+               count: pagesize };
 
            $.ajax( window.location.pathname, {
                    contentType: "application/json",
-                           data: JSON.stringify($(form).serializeObject("paging", pg)),
+                          data: JSON.stringify($(form).serializeObject("paging", pg)),
                        context: $(form),
                       dataType: "json",
                         method: "POST",
@@ -131,7 +131,7 @@ jQuery(function($) {
            $(tbody).find("td.dca a[popup]")
            .each(function(idx) {
                      var capopid = $(this).attr("popup");
-                     var capop = $(capopid + " td[calink]");
+                     var capop   = $(capopid + " td[calink]");
                      if( capop.length == 0 ) {
                          return true;
                      }
@@ -145,9 +145,9 @@ jQuery(function($) {
 "This Certificate Authority has provided the following information about its operation.  "+
 "<p>Links will open in a new window.<p><ul>";
                                  var ptxt = "";
-                                 var key, ifc=10000000;
+                                 var key, ifc = 10000000;
                                  for( key in meta[url].meta ) {
-                                     var tgt = meta[url].meta[key];
+                                     var tgt  = meta[url].meta[key];
                                      var desc = key;
 
                                      if( kmeta.hasOwnProperty(key) ) {
@@ -196,16 +196,17 @@ jQuery(function($) {
                                  .attr("popup","#"+id)
                                  .wrapInner("<a></a>")
                                  .click(function(evt){
-                                            var dlgId = $(this).attr("popup");
+                                            var dlgId  = $(this).attr("popup");
                                             var dlgCaa = dlgId + "caa";
-                                                var caareq = { function:"caarecs",
-                                                               domain  : domain,
-                                                               caurl   : url,
-                                                               ids     : [] };
+                                            var caareq = { function:"caarecs",
+                                                           domain  : domain,
+                                                           caurl   : url,
+                                                           ids     : [] };
                                             if( meta[url].meta.hasOwnProperty("caaIdentities")) {
-                                                meta[url].meta["caaIdentities"].forEach(function( val, att, arr) {
-                                                                                            this.ids.push(val);
-                                                                                        }, caareq);
+                                                meta[url].meta["caaIdentities"]
+                                                    .forEach(function( val, att, arr) {
+                                                                 this.ids.push(val);
+                                                             }, caareq);
                                             }
                                             $(dlgCaa).html("Inspecting configuration&hellip;");
                                             $.ajax( window.location.pathname, {
@@ -227,19 +228,18 @@ jQuery(function($) {
                                             $(dlgId).dialog("open");
                                             return true;}
                                         );
-
                          }
                      } else {
-                         meta[url] = { valid: false, id: ++can };
-                         var req = { function: "getcadir",
-                                     cadirurl: url };
+                         meta[url] = {    valid: false, id: ++can };
+                         var req   = { function: "getcadir",
+                                       cadirurl: url };
                          $.ajax( window.location.pathname, {
                                  context: this,
                              contentType: "application/json",
                                     data: JSON.stringify(req),
-                               dataType: "json",
-                                 method: "POST",
-                                timeout: ajaxTimeout
+                                dataType: "json",
+                                  method: "POST",
+                                 timeout: ajaxTimeout
                                          })
                              .done(function( data, status, xhr ) {
                                        displayMessageJSON(data);
@@ -327,20 +327,20 @@ jQuery(function($) {
            $("select.portsel")
            .change(function() {
                        var s = "";
-                       var o = $("select.portsel").prop("selectedOptions");
+                       var o = $(this).prop("selectedOptions");
                        if( o.length ) {
                            for( var i = 0; i < o.length; ++i ) {
                                s = s + ", " + o[i].value.toString();
                            }
                        } else {
-                           s = "none";
+                           s = ", none";
                        }
                        $(this).closest("form").find("span.selected").html(s.substr(2));
                        return true;
                    });
            $("span.portsel-open")
            .click(function() {
-                      $("select.portsel")
+                      $(this).closest("p").find("select.portsel")
                           .attr("size",
                                 $(this)
                                 .toggleClass("ui-icon-triangle-1-e ui-icon-triangle-1-s")
@@ -352,7 +352,7 @@ jQuery(function($) {
                       var form = $(this).closest("form.inspecthost");
                       $(form).find("input[type=\"hidden\"][name=\"host\"]").val($(this).val());
                       var postdata = $(form).serializeObject();
-                      var ports = [];
+                      var ports    = [];
                       $(form).find("select.portsel option:selected")
                           .each(function(idx) {
                                     ports.push( { num:$(this).val(), name:$(this).text()} );
@@ -398,11 +398,11 @@ jQuery(function($) {
                           postdata.port = ports[p].num;
                           $.ajax( window.location.pathname, {
                                   data: JSON.stringify(postdata),
-                                  context: $("#" + pids[ports[p].num]),
-                                  dataType: "json",
-                                  method: "POST",
-                                  contentType: "application/json",
-                                  timeout: ajaxTimeout
+                               context: $("#" + pids[ports[p].num]),
+                              dataType: "json",
+                                method: "POST",
+                           contentType: "application/json",
+                               timeout: ajaxTimeout
                                           })
                               .done(function( data, status, xhr ) {
                                         displayMessageJSON(data);
@@ -432,9 +432,9 @@ jQuery(function($) {
        ncrumbs = 5,
        updatePaging = function( td, pars ) {
            var pagesize = parseInt($("select[name=\"pagelimit\"]").val());
-           pars.start = parseInt(pars.start) -1;
-           pars.count = parseInt(pars.count);
-           pars.total = parseInt(pars.total);
+           pars.start   = parseInt(pars.start) -1;
+           pars.count   = parseInt(pars.count);
+           pars.total   = parseInt(pars.total);
            var nav = "<ul class=\"horiz\">";
            var npgs = Math.trunc((pars.total + (pagesize -1))/pagesize);
            if( npgs <= 1 ) {
@@ -445,9 +445,9 @@ jQuery(function($) {
            if( pars.start + pars.count > pars.total ) pars.count = pars.total - pars.start;
 
            var crumbspan = pagesize * ncrumbs;
-           var startpg = Math.trunc(pars.start / pagesize) * pagesize;
-           var startcr = Math.trunc(pars.start / crumbspan) * crumbspan;
-           var lastpg  = Math.trunc(((pars.total -1) + (pagesize -1))/ pagesize) * pagesize;
+           var startpg   = Math.trunc(pars.start / pagesize) * pagesize;
+           var startcr   = Math.trunc(pars.start / crumbspan) * crumbspan;
+           var lastpg    = Math.trunc(((pars.total -1) + (pagesize -1))/ pagesize) * pagesize;
 
            if( startcr >= crumbspan ) {
                nav += "<li><a value=\"" + ((startcr +1) - crumbspan).toString() + "\">&Lt;</a></li>";
@@ -473,10 +473,10 @@ jQuery(function($) {
        maxmatch =
            $("select[name=\"pagelimit\"]")
            .change(function(evt) {
-                       var first = $("table.actions tr.pagenav li.active a").attr("value");
+                       var first    = $("table.actions tr.pagenav li.active a").attr("value");
                        var pagesize = $(this).val();
-                       maxmatch = pagesize;
-                       first = (Math.trunc((first -1) / pagesize) * pagesize) +1;
+                       maxmatch     = pagesize;
+                       first        = (Math.trunc((first -1) / pagesize) * pagesize) +1;
                        return( refreshCerts(first) );
                    }).val(),
        showmore = function(li) {
@@ -485,12 +485,12 @@ jQuery(function($) {
            return false;
        },
        refreshCerts = function(start) {
-           filter  = $("#namefilter").val();
+           filter   = $("#namefilter").val();
            maxmatch = parseInt( $("select[name=\"pagelimit\"]").val() );
-           var req = { function: "certformdata",
-                       paging: { start: parseInt( start ),
-                                 count: maxmatch,
-                                filter: filter } };
+           var req  = { function: "certformdata",
+                        paging: { start: parseInt( start ),
+                                  count: maxmatch,
+                                 filter: filter } };
            $("#domains").html("<tr><td colspan=\"99\" class=\"comfort\">Retrieving data&hellip;</td></tr>");
            $.ajax( window.location.pathname, {
                    context: $("#certform"),
@@ -526,8 +526,8 @@ jQuery(function($) {
            });
          return checkedChange();
       });
-      makebuttons( [ { name: ["renew"], icon: "ui-icon-refresh"},
-                     { name: ["revoke"], icon: "ui-icon-trash"},
+      makebuttons( [ { name: ["renew"],      icon: "ui-icon-refresh"},
+                     { name: ["revoke"],     icon: "ui-icon-trash"},
                      { name: ["acctimport"], icon: "ui-icon-folder-open"} ] );
       $("#clearmsg").button({ icon: "ui-icon-circle-close"})
           .click(function(event) {

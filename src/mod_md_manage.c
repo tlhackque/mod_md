@@ -1044,27 +1044,28 @@ static apr_status_t md_manage_filter_match( void *value, void *baton )
 POSTHANDLER(queue_function) {
     apr_status_t    rv;
     apr_sockaddr_t *sa;
-    apr_socket_t  *sock = NULL;
-    const char    *msg = NULL;
-    apr_size_t     msglen;
-    const char    *req = NULL;
-    apr_time_t     now;
-    int            i;
-    unsigned char  link_key[MANAGE_KEY_LENGTH];
+    apr_socket_t   *sock = NULL;
+    const char     *msg = NULL;
+    apr_size_t      msglen;
+    const char     *req = NULL, *s;
+    apr_time_t      now;
+    int             i;
+    unsigned char   link_key[MANAGE_KEY_LENGTH];
 
     (void)sc;
 
     md_store_fs_get_manage_key(md_reg_store_get(mc->reg),link_key, sizeof(link_key));
-
     now = apr_time_now();
+    s = ap_auth_type(r);
 
-    md_json_sets(r->user? r->user : "Unknown", pars, "requestor", "username", NULL );
-    md_json_sets(ap_get_useragent_host(r, REMOTE_NAME, NULL), pars, "requestor", "host", NULL );
-    md_json_set_time(now, pars, "timestamp", NULL );
+    md_json_sets(r->user? r->user : "Unknown",                pars, "requestor", "username", NULL );
+    md_json_sets(s && *s? s       : "Unknown",                pars, "requestor", "authtype", NULL );
+    md_json_sets(ap_get_useragent_host(r, REMOTE_NAME, NULL), pars, "requestor", "host",     NULL );
+    md_json_set_time(now,                                     pars, "timestamp", NULL );
 
     if( !((req = md_json_writep( pars, r->pool, MD_JSON_FMT_DEBUG )) &&
           (msglen = strlen(req))) ){
-        return md_json_resp( r, APR_EGENERAL, resp, "Failed to queue" );
+        return md_json_resp( r, APR_EGENERAL, resp, "Failed to serialize request" );
     }
     ap_log_rerror(APLOG_MARK, APLOG_TRACE4, 0, r,
                   "manage GUI request:%s", req);
@@ -1075,7 +1076,7 @@ POSTHANDLER(queue_function) {
                                                     0, r->pool )) ||
         APR_SUCCESS != (rv = apr_socket_create( &sock, sa->family, SOCK_STREAM,
                                                 APR_PROTO_TCP, r->pool )) ) {
-        ap_log_rerror(APLOG_MARK, APLOG_TRACE5, rv, r, "Unable to create queuing socket");
+        ap_log_rerror(APLOG_MARK, APLOG_TRACE4, rv, r, "Unable to create link socket for %s", req);
         goto respond;
     }
 

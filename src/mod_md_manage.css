@@ -95,6 +95,12 @@ table.accountinfo .ui-button {
     -webkit-border-radius: 20px;
     -moz-border-radius: 20px;
 }
+#clearmsg {
+    background-color: #e0e0e0;
+}
+#clearmsg:hover {
+    background-color: #f5f5f575;
+}
 p.notes {
     font-size: small;
 }
